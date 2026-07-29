@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Animated,
 } from "react-native";
 import {
   Text,
@@ -57,6 +58,15 @@ export default function AssistantScreen() {
   });
   const isTyping = isStreaming;
 
+  // Auto-scroll to the newest message when one is ADDED. We deliberately do NOT
+  // scroll on every content-size change (see the ScrollView below): expanding
+  // the "Thinking" panel on a finished message grows the content, and yanking
+  // the view to the bottom then is disorienting — the user wants to read it in
+  // place, not be thrown past it.
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages.length]);
+
   // Plain text of a message = its text parts joined (for the copy button).
   const messageText = (m: AssistantUIMessage): string =>
     (m.parts ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
@@ -90,6 +100,25 @@ export default function AssistantScreen() {
   const wsRef = useRef<WebSocket | null>(null);
   const [dictationInterim, setDictationInterim] = useState("");
   const g = global as any;
+
+  // Calm, native-driven pulse for the "Listening" dot (built-in Animated — no
+  // reanimated dep). Reset to 1 and stopped on cleanup so a stale faded dot
+  // never lingers after dictation ends.
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isDictating) {
+      pulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isDictating, pulse]);
 
   useEffect(() => {
     LiveAudioStream.on("data", (data: string) => {
@@ -303,9 +332,11 @@ export default function AssistantScreen() {
         ref={scrollViewRef}
         style={styles.chatArea}
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-        onContentSizeChange={() =>
-          scrollViewRef.current?.scrollToEnd({ animated: true })
-        }
+        onContentSizeChange={() => {
+          // Only follow growing content while the assistant is streaming — so
+          // toggling a "Thinking" panel on a finished message doesn't scroll.
+          if (isTyping) scrollViewRef.current?.scrollToEnd({ animated: true });
+        }}
       >
         {messages.map((msg, index) => {
           const isUser = msg.role === "user";
@@ -399,80 +430,74 @@ export default function AssistantScreen() {
 
       <View
         style={[
-          styles.inputRow,
+          styles.composer,
           {
-            backgroundColor: theme.colors.surface,
+            backgroundColor: isDictating ? theme.colors.surfaceVariant : theme.colors.surface,
+            borderTopColor: isDictating ? theme.colors.primary : theme.colors.outlineVariant,
+            borderTopWidth: isDictating ? 2 : StyleSheet.hairlineWidth,
             paddingBottom: Math.max(insets.bottom, 16),
           },
         ]}
       >
-        {isDictating && dictationInterim ? (
-          <View
-            style={{
-              position: "absolute",
-              top: -24,
-              left: 24,
-              right: 60,
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 13,
-                color: theme.colors.primary,
-                fontStyle: "italic",
-              }}
-              numberOfLines={1}
-            >
-              {dictationInterim}
-            </Text>
+        {/* Listening banner — a REAL in-flow child (never position:absolute,
+            never negative-top), so it can never be clipped by the ScrollView
+            boundary or the top border. Shown the instant dictation starts. */}
+        {isDictating && (
+          <View style={[styles.listeningBanner, { backgroundColor: theme.colors.primaryContainer }]}>
+            <View style={styles.listeningHeader}>
+              <Animated.View
+                style={[
+                  styles.listeningDot,
+                  { backgroundColor: theme.colors.primary, opacity: pulse },
+                ]}
+              />
+              <Text
+                variant="labelMedium"
+                style={[styles.listeningLabel, { color: theme.colors.primary }]}
+              >
+                Listening…
+              </Text>
+            </View>
+            {dictationInterim ? (
+              <Text
+                variant="bodyMedium"
+                numberOfLines={3}
+                style={[styles.interimText, { color: theme.colors.onPrimaryContainer }]}
+              >
+                {dictationInterim}
+              </Text>
+            ) : null}
           </View>
-        ) : isDictating ? (
-          <View
-            style={{
-              position: "absolute",
-              top: -20,
-              left: 24,
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 10,
-                color: "#10B981",
-                fontWeight: "bold",
-                textTransform: "uppercase",
-              }}
-            >
-              Listening...
-            </Text>
-          </View>
-        ) : null}
-        <TextInput
-          mode="outlined"
-          placeholder={isDictating ? "Listening..." : "Message plan AI..."}
-          value={inputText}
-          onChangeText={setInputText}
-          style={styles.textInput}
-          multiline
-          maxLength={500}
-        />
-        <IconButton
-          icon={
-            inputText.trim().length > 0
-              ? "send"
-              : isDictating
-                ? "stop-circle"
-                : "microphone"
-          }
-          iconColor={isDictating ? theme.colors.error : undefined}
-          mode="contained"
-          size={24}
-          onPress={inputText.trim().length > 0 ? handleSend : handleDictate}
-          style={styles.sendButton}
-        />
+        )}
+
+        {/* Input row — TextInput accumulator + send/mic/stop button. Logic
+            unchanged; row now bottom-anchors the button to the growing field. */}
+        <View style={styles.inputRow}>
+          <TextInput
+            mode="outlined"
+            placeholder={isDictating ? "Listening…" : "Message plan AI…"}
+            value={inputText}
+            onChangeText={setInputText}
+            style={styles.textInput}
+            contentStyle={styles.textInputContent}
+            multiline
+            maxLength={500}
+          />
+          <IconButton
+            icon={
+              inputText.trim().length > 0
+                ? "send"
+                : isDictating
+                  ? "stop-circle"
+                  : "microphone"
+            }
+            iconColor={isDictating ? theme.colors.error : undefined}
+            mode="contained"
+            size={24}
+            onPress={inputText.trim().length > 0 ? handleSend : handleDictate}
+            style={styles.sendButton}
+          />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -497,19 +522,49 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
   },
-  inputRow: {
-    flexDirection: "row",
+  composer: {
     paddingHorizontal: 16,
     paddingTop: 12,
+    // backgroundColor, borderTopColor, borderTopWidth, paddingBottom are
+    // applied inline (theme + active dictation state).
+  },
+  listeningBanner: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 10,
+    gap: 6,
+  },
+  listeningHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.1)",
+    gap: 8,
+  },
+  listeningDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  listeningLabel: {
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+  interimText: {
+    fontStyle: "italic",
+    lineHeight: 20,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end", // bottom-anchors the button to the growing field
   },
   textInput: {
     flex: 1,
     marginRight: 12,
     backgroundColor: "transparent",
     maxHeight: 100,
+  },
+  textInputContent: {
+    paddingRight: 8, // internal text → box edge clearance (send-button collision fix)
   },
   sendButton: {
     marginBottom: 4,
