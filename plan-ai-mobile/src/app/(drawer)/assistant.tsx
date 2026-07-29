@@ -10,9 +10,7 @@ import {
 import {
   Text,
   TextInput,
-  Button,
   useTheme,
-  Card,
   Avatar,
   ActivityIndicator,
   IconButton,
@@ -21,15 +19,11 @@ import {
   Divider,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  streamAssistantMessage,
-  AssistantMessage,
-} from "../../services/assistantApi";
-import { planAiApi, useAuth } from "../../context/AuthContext";
+import { useAssistantChatMobile, type AssistantUIMessage } from "../../services/assistantChat";
+import AssistantMessage from "../../components/AssistantMessage";
+import { planAiApi } from "../../context/AuthContext";
 import type { Project } from "../../services/planAiApi";
-import { useNavigation, router } from "expo-router";
 import { ScreenHeader } from "../../components/ScreenHeader";
-import Markdown from "react-native-markdown-display";
 import * as Clipboard from "expo-clipboard";
 import LiveAudioStream from "react-native-live-audio-stream";
 import {
@@ -40,22 +34,11 @@ import {
 export default function AssistantScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { activeWorkspaceId } = useAuth();
-  const navigation = useNavigation();
 
-  const [messages, setMessages] = useState<AssistantMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Hi! I am your Executive AI Assistant. How can I help you today?",
-    },
-  ]);
   const [inputText, setInputText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [isDictating, setIsDictating] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // ── Project focus state ──────────────────────────────────────────────────
   const [projects, setProjects] = useState<Project[]>([]);
@@ -67,6 +50,41 @@ export default function AssistantScreen() {
   }, []);
 
   const focusedProject = projects.find((p) => p.id === selectedProjectId);
+
+  // ── Chat over the AI SDK UI Message Stream (reasoning + tool cards) ────────
+  const { messages, sendMessage, isStreaming } = useAssistantChatMobile({
+    projectId: selectedProjectId || undefined,
+  });
+  const isTyping = isStreaming;
+
+  // Plain text of a message = its text parts joined (for the copy button).
+  const messageText = (m: AssistantUIMessage): string =>
+    (m.parts ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
+
+  const markdownStyles = React.useMemo(
+    () => ({
+      body: { color: theme.colors.onSurface, fontSize: 16, lineHeight: 24, marginVertical: 0 },
+      paragraph: { marginTop: 0, marginBottom: 8 },
+      list_item: { marginBottom: 4 },
+      code_inline: {
+        backgroundColor: theme.colors.surfaceVariant,
+        color: theme.colors.primary,
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+      },
+      fence: {
+        backgroundColor: theme.colors.surfaceVariant,
+        color: theme.colors.onSurface,
+        padding: 8,
+        borderRadius: 8,
+        fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+        marginTop: 8,
+        marginBottom: 8,
+      },
+    }),
+    [theme],
+  );
 
   // Real-time dictation states
   const wsRef = useRef<WebSocket | null>(null);
@@ -97,7 +115,7 @@ export default function AssistantScreen() {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "end_stream" }));
         }
-        
+
         if (abort) {
           ws.close();
         } else {
@@ -181,381 +199,16 @@ export default function AssistantScreen() {
     }
   };
 
-  const handleSend = async () => {
-    if (!inputText.trim()) return;
+  const handleSend = () => {
+    const text = inputText.trim();
+    if (!text || isStreaming) return;
 
     if (isDictating) {
       stopDictation(true); // abort dictation, don't let trailing words leak into the next input
     }
 
-    const userMsg: AssistantMessage = { role: "user", content: inputText };
-    const newMessages = [...messages, userMsg];
-
-    setMessages(newMessages);
+    sendMessage({ text });
     setInputText("");
-    setIsTyping(true);
-
-    // Initial slot for assistant reply
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-    try {
-      const headers = await planAiApi.getAuthHeaders();
-      await streamAssistantMessage(
-        headers,
-        newMessages,
-        (chunk) => {
-          setMessages((prev) => {
-            const last = { ...prev[prev.length - 1] };
-            // Standard React Native Chunking Fallback merges the full text anyway,
-            // but if we support true streams, this appends correctly.
-            last.content = last.content === "" ? chunk : last.content + chunk;
-            const res = [...prev];
-            res[res.length - 1] = last;
-            return res;
-          });
-        },
-        () => setIsTyping(false),
-        (err) => {
-          setIsTyping(false);
-          setMessages((prev) => {
-            const last = { ...prev[prev.length - 1] };
-            last.content += "\n[Error communicating with server.]";
-            const res = [...prev];
-            res[res.length - 1] = last;
-            return res;
-          });
-        },
-        selectedProjectId || undefined,
-      );
-    } catch (err) {
-      setIsTyping(false);
-    }
-  };
-
-  /**
-   * Message Interceptor: Parses strictly formatted markdown blocks for UI Actions
-   */
-  const renderMessageContent = (content: string) => {
-    // Regex looking for: [UI:CONFIRM_DOC ...]
-    const docMatch = content.match(/\[UI:CONFIRM_DOC\s+(.*?)\]/);
-
-    if (docMatch) {
-      const attrsStr = docMatch[1];
-      const getAttr = (name: string) => {
-        const match = attrsStr.match(new RegExp(`${name}="([^"]*)"`));
-        return match ? match[1] : "";
-      };
-
-      const purpose = getAttr("purpose");
-      const recordingId = getAttr("recordingId");
-      const recordingName = getAttr("recordingName") || recordingId;
-      const contextId = getAttr("contextId");
-      const contextName = getAttr("contextName") || contextId || "None";
-      const textBefore = content.split(/\[UI:CONFIRM_DOC/)[0].trim();
-
-      return (
-        <View style={{ gap: 12 }}>
-          {textBefore.length > 0 && (
-            <Text style={{ color: theme.colors.onSurface }}>{textBefore}</Text>
-          )}
-          <Card
-            mode="elevated"
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              marginTop: 8,
-            }}
-          >
-            <Card.Title
-              title="Generate Document"
-              subtitle="Confirmation Required"
-              left={(props) => (
-                <Avatar.Icon {...props} icon="file-document-outline" />
-              )}
-            />
-            <Card.Content style={{ gap: 8 }}>
-              <Text variant="bodyMedium">
-                Ensure the following parameters are correct before generating:
-              </Text>
-              <View
-                style={{
-                  backgroundColor: theme.colors.elevation.level2,
-                  padding: 8,
-                  borderRadius: 8,
-                }}
-              >
-                <Text variant="labelMedium" style={{ fontWeight: "bold" }}>
-                  Purpose:
-                </Text>
-                <Text variant="bodyMedium">{purpose}</Text>
-                <Text
-                  variant="labelMedium"
-                  style={{ fontWeight: "bold", marginTop: 4 }}
-                >
-                  Recording ID:
-                </Text>
-                <Text variant="bodyMedium">{recordingName}</Text>
-                <Text
-                  variant="labelMedium"
-                  style={{ fontWeight: "bold", marginTop: 4 }}
-                >
-                  Context:
-                </Text>
-                <Text variant="bodyMedium">{contextName}</Text>
-              </View>
-            </Card.Content>
-            <View style={{ marginTop: 16, gap: 12 }}>
-              <Button
-                mode="contained"
-                onPress={async () => {
-                  setIsTyping(true);
-                  try {
-                    const headers = await planAiApi.getAuthHeaders();
-                    const res = await fetch(
-                      `${process.env.EXPO_PUBLIC_PLAN_AI_API_URL || "http://10.0.2.2:8080"}/api/documents`,
-                      {
-                        method: "POST",
-                        headers: headers,
-                        body: JSON.stringify({
-                          title: "AI Generated Document",
-                          transcriptIds: recordingId ? [recordingId] : [],
-                          contextIds:
-                            contextId && contextId !== "None"
-                              ? [contextId]
-                              : [],
-                          prompt: purpose,
-                        }),
-                      },
-                    );
-
-                    if (!res.ok) throw new Error("Failed to generate document");
-                    const documentData = await res.json();
-
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        role: "assistant",
-                        content: `Success! I have generated your document: [View Document](/doc/${documentData.id})`,
-                      },
-                    ]);
-                  } catch (e) {
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        role: "assistant",
-                        content: `Sorry, there was an error generating the document.`,
-                      },
-                    ]);
-                  } finally {
-                    setIsTyping(false);
-                  }
-                }}
-              >
-                Confirm & Generate
-              </Button>
-              <Button
-                mode="text"
-                textColor={theme.colors.error}
-                onPress={() => {
-                  setMessages((prev) => [
-                    ...prev,
-                    { role: "user", content: "Cancel that document." },
-                  ]);
-                }}
-              >
-                Cancel
-              </Button>
-            </View>
-          </Card>
-        </View>
-      );
-    }
-
-    // Regex looking for: [UI:CONFIRM_TASK ...]
-    const taskMatch = content.match(/\[UI:CONFIRM_TASK\s+(.*?)\]/);
-
-    if (taskMatch) {
-      const attrsStr = taskMatch[1];
-      const getAttr = (name: string) => {
-        const match = attrsStr.match(new RegExp(`${name}="([^"]*)"`));
-        return match ? match[1] : "";
-      };
-
-      const title = getAttr("title");
-      const description = getAttr("description");
-      const projectId = getAttr("projectId");
-      const projectName = getAttr("projectName") || projectId;
-      const textBefore = content.split(/\[UI:CONFIRM_TASK/)[0].trim();
-
-      return (
-        <View style={{ gap: 12 }}>
-          {textBefore.length > 0 && (
-            <Text style={{ color: theme.colors.onSurface }}>{textBefore}</Text>
-          )}
-          <Card
-            mode="elevated"
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              marginTop: 8,
-            }}
-          >
-            <Card.Title
-              title="Create Task"
-              subtitle="Confirmation Required"
-              left={(props) => (
-                <Avatar.Icon {...props} icon="check-circle-outline" />
-              )}
-            />
-            <Card.Content style={{ gap: 8 }}>
-              <Text variant="bodyMedium">
-                Ensure the following details are correct before creating the
-                task:
-              </Text>
-              <View
-                style={{
-                  backgroundColor: theme.colors.elevation.level2,
-                  padding: 8,
-                  borderRadius: 8,
-                }}
-              >
-                <Text variant="labelMedium" style={{ fontWeight: "bold" }}>
-                  Title:
-                </Text>
-                <Text variant="bodyMedium">{title}</Text>
-                <Text
-                  variant="labelMedium"
-                  style={{ fontWeight: "bold", marginTop: 4 }}
-                >
-                  Description:
-                </Text>
-                <Text variant="bodyMedium">{description || "None"}</Text>
-                <Text
-                  variant="labelMedium"
-                  style={{ fontWeight: "bold", marginTop: 4 }}
-                >
-                  Project:
-                </Text>
-                <Text variant="bodyMedium">{projectName}</Text>
-              </View>
-            </Card.Content>
-            <View style={{ marginTop: 16, gap: 12 }}>
-              <Button
-                mode="contained"
-                onPress={async () => {
-                  setIsTyping(true);
-                  try {
-                    const task = await planAiApi.createProjectTask(projectId, {
-                      title,
-                      description,
-                    });
-
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        role: "assistant",
-                        content: `Success! Task created: [View Task](/task/${task.id})`,
-                      },
-                    ]);
-                  } catch (e) {
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        role: "assistant",
-                        content: `Sorry, there was an error creating the task.`,
-                      },
-                    ]);
-                  } finally {
-                    setIsTyping(false);
-                  }
-                }}
-              >
-                Confirm & Create Task
-              </Button>
-              <Button
-                mode="text"
-                textColor={theme.colors.error}
-                onPress={() => {
-                  setMessages((prev) => [
-                    ...prev,
-                    { role: "user", content: "Cancel that task." },
-                  ]);
-                }}
-              >
-                Cancel
-              </Button>
-            </View>
-          </Card>
-        </View>
-      );
-    }
-
-    return (
-      <Markdown
-        style={{
-          body: {
-            color: theme.colors.onSurface,
-            fontSize: 16,
-            lineHeight: 24,
-            marginVertical: 0,
-          },
-          paragraph: { marginTop: 0, marginBottom: 8 },
-          list_item: { marginBottom: 4 },
-          code_inline: {
-            backgroundColor: theme.colors.surfaceVariant,
-            color: theme.colors.primary,
-            borderRadius: 4,
-            paddingHorizontal: 4,
-            fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-          },
-          fence: {
-            backgroundColor: theme.colors.surfaceVariant,
-            color: theme.colors.onSurface,
-            padding: 8,
-            borderRadius: 8,
-            fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-            marginTop: 8,
-            marginBottom: 8,
-          },
-          code_block: {
-            backgroundColor: theme.colors.surfaceVariant,
-            color: theme.colors.onSurface,
-            padding: 8,
-            borderRadius: 8,
-            fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-          },
-        }}
-        onLinkPress={(url) => {
-          console.log(`[Assistant] onLinkPress called with URL: ${url}`);
-          if (url.startsWith("/")) {
-            let mobileUrl = url;
-            if (mobileUrl.startsWith("/projects/")) {
-              mobileUrl = mobileUrl.replace("/projects/", "/project/");
-            } else if (mobileUrl.startsWith("/transcripts/")) {
-              mobileUrl = mobileUrl.replace("/transcripts/", "/transcript/");
-            } else if (mobileUrl.startsWith("/recordings/")) {
-              mobileUrl = mobileUrl.replace("/recordings/", "/transcript/");
-            } else if (mobileUrl.startsWith("/tasks/")) {
-              mobileUrl = mobileUrl.replace("/tasks/", "/task/");
-            } else if (mobileUrl.startsWith("/docs/")) {
-              mobileUrl = mobileUrl.replace("/docs/", "/doc/");
-            }
-            
-            console.log(`[Assistant] Rewrote URL for mobile routing: ${mobileUrl}`);
-            
-            try {
-              // @ts-ignore
-              router.push(mobileUrl);
-              console.log(`[Assistant] Successfully routed to: ${mobileUrl}`);
-            } catch (err) {
-              console.error(`[Assistant] Failed to route to ${mobileUrl}:`, err);
-            }
-            return false;
-          }
-          return true;
-        }}
-      >
-        {content || "..."}
-      </Markdown>
-    );
   };
 
   return (
@@ -656,9 +309,10 @@ export default function AssistantScreen() {
       >
         {messages.map((msg, index) => {
           const isUser = msg.role === "user";
+          const isLastAssistant = !isUser && index === messages.length - 1;
           return (
             <View
-              key={index}
+              key={msg.id}
               style={[
                 styles.messageRow,
                 isUser ? styles.messageRowUser : styles.messageRowAssistant,
@@ -687,10 +341,14 @@ export default function AssistantScreen() {
                 <View style={{ paddingRight: 24 }}>
                   {isUser ? (
                     <Text style={{ color: theme.colors.onPrimaryContainer }}>
-                      {msg.content}
+                      {messageText(msg)}
                     </Text>
                   ) : (
-                    renderMessageContent(msg.content)
+                    <AssistantMessage
+                      message={msg}
+                      streaming={isLastAssistant && isTyping}
+                      markdownStyles={markdownStyles}
+                    />
                   )}
                 </View>
                 <IconButton
@@ -701,7 +359,7 @@ export default function AssistantScreen() {
                       ? theme.colors.onPrimaryContainer
                       : theme.colors.onSurfaceVariant
                   }
-                  onPress={() => Clipboard.setStringAsync(msg.content)}
+                  onPress={() => Clipboard.setStringAsync(messageText(msg))}
                   style={{
                     position: "absolute",
                     top: 4,
@@ -717,6 +375,21 @@ export default function AssistantScreen() {
             </View>
           );
         })}
+        {messages.length === 0 && (
+          <View style={{ alignItems: "center", paddingTop: 48, paddingHorizontal: 24 }}>
+            <Avatar.Icon size={56} icon="robot" style={{ backgroundColor: theme.colors.primary }} />
+            <Text variant="titleMedium" style={{ marginTop: 16, textAlign: "center" }}>
+              How can I help you today?
+            </Text>
+            <Text
+              variant="bodySmall"
+              style={{ marginTop: 8, textAlign: "center", opacity: 0.7 }}
+            >
+              Ask about your meetings, or take actions like syncing tasks to Linear — with your
+              confirmation.
+            </Text>
+          </View>
+        )}
         {isTyping && (
           <View style={[styles.messageRow, styles.messageRowAssistant]}>
             <ActivityIndicator size="small" style={{ marginLeft: 40 }} />

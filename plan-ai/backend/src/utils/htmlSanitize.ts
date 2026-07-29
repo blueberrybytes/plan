@@ -394,11 +394,16 @@ export const finalizePrototypeHtml = (
   // Strip any stray navigation the model added despite instructions — with our
   // tabs it is redundant, and a leftover href="#x" could still dead-end.
   const stripped = screens.map((s) =>
-    s.html.replace(/\shref="[^"]*"/gi, "").replace(/class="berry-screen"/gi, 'class="berry-screen"'),
+    s.html
+      .replace(/\shref="[^"]*"/gi, "")
+      .replace(/class="berry-screen"/gi, 'class="berry-screen"'),
   );
 
   const radios = screens
-    .map((_, i) => `<input type="radio" name="berry-nav" id="berry-scr-${i}"${i === 0 ? " checked" : ""} class="berry-radio">`)
+    .map(
+      (_, i) =>
+        `<input type="radio" name="berry-nav" id="berry-scr-${i}"${i === 0 ? " checked" : ""} class="berry-radio">`,
+    )
     .join("\n");
 
   const tabs = screens

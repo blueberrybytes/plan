@@ -29,6 +29,7 @@ import { useAssistantStream, AssistantUIMessage } from "./shared/useAssistantStr
 import { useChatAttachments } from "./shared/useChatAttachments";
 import AttachmentPreviewStrip from "./shared/AttachmentPreviewStrip";
 import AttachmentMessageStrip from "./shared/AttachmentMessageStrip";
+import AssistantChatPanelV2 from "./AssistantChatPanelV2";
 
 interface AssistantChatPanelProps {
   /**
@@ -64,7 +65,7 @@ const LS_PROJECT_KEY = "chathome_project_id";
  * The remaining concerns are surface-specific: project focus selector +
  * persistence target (Redux vs localStorage per project).
  */
-const AssistantChatPanel: React.FC<AssistantChatPanelProps> = ({
+const AssistantChatPanelLegacy: React.FC<AssistantChatPanelProps> = ({
   lockedProjectId,
   storageKey = "redux:chatHome",
   suggestions: suggestionsOverride,
@@ -425,6 +426,28 @@ const AssistantChatPanel: React.FC<AssistantChatPanelProps> = ({
       />
     </Box>
   );
+};
+
+/**
+ * Dispatcher: routes to the new AI-SDK `useChat` surface (reasoning panel +
+ * tool confirmation cards) when `localStorage.assistant_chat_v2 = "1"`, else the
+ * legacy panel. A hook-free wrapper so each branch keeps a consistent hook order.
+ * The flag lets the migration be verified before it becomes the default; the
+ * legacy panel still owns attachments + persistence until then.
+ */
+const AssistantChatPanel: React.FC<AssistantChatPanelProps> = (props) => {
+  const useV2 = typeof window !== "undefined" && localStorage.getItem("assistant_chat_v2") === "1";
+  if (useV2) {
+    return (
+      <AssistantChatPanelV2
+        lockedProjectId={props.lockedProjectId}
+        suggestions={props.suggestions}
+        showWelcome={props.showWelcome}
+        storageKey={props.storageKey}
+      />
+    );
+  }
+  return <AssistantChatPanelLegacy {...props} />;
 };
 
 export default AssistantChatPanel;

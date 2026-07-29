@@ -376,7 +376,9 @@ export const handleIncomingMessage = async (message: TelegramMessage): Promise<v
   // Berry asks questions, then asks which deliverable they want, and just talks.
   // Without triage (model down) we fall back to the length heuristic so the bot
   // still works, producing the full set.
-  const shouldGenerate = triage ? triage.phase === "GENERATE" : incoming.length >= FALLBACK_BRIEF_LENGTH;
+  const shouldGenerate = triage
+    ? triage.phase === "GENERATE"
+    : incoming.length >= FALLBACK_BRIEF_LENGTH;
   const brief = triage?.brief?.trim() || incoming;
 
   if (triage && !shouldGenerate) {
@@ -593,9 +595,7 @@ export const handleIncomingMessage = async (message: TelegramMessage): Promise<v
       await saveConversation(link.id, appendTurn(history, "bot", deliveredSummary));
     }
 
-    logger.info(
-      `[telegram] delivered to chat ${chatId} (${[...wanted].join("+") || "nothing"})`,
-    );
+    logger.info(`[telegram] delivered to chat ${chatId} (${[...wanted].join("+") || "nothing"})`);
   } catch (err) {
     logger.error(`[telegram] intake failed for chat ${chatId}`, err);
     await telegram

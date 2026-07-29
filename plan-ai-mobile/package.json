@@ -37,6 +37,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/react": "^3.0.103",
     "@invertase/react-native-apple-authentication": "^2.5.1",
     "@notifee/react-native": "^9.1.8",
     "@react-native-firebase/app": "^24.0.0",
@@ -48,6 +49,7 @@
     "@react-navigation/elements": "^2.9.10",
     "@react-navigation/native": "^7.1.33",
     "@sentry/react-native": "^8.8.0",
+    "ai": "^6.0.101",
     "axios": "^1.15.0",
     "buffer": "^6.0.3",
     "expo": "~55.0.15",

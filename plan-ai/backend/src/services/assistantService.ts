@@ -1,6 +1,6 @@
 import {
   getConfiguredModel,
-  getFallbackProviderOptions,
+  getReasoningProviderOptions,
   DEFAULT_AI_MODEL,
 } from "../utils/aiModelUtils";
 import { streamText, convertToModelMessages, UIMessage, stepCountIs, tool } from "ai";
@@ -9,6 +9,14 @@ import fs from "fs";
 import path from "path";
 import prisma from "../prisma/prismaClient";
 import { aiUsageService } from "./aiUsageService";
+import {
+  previewTaskSync,
+  updateTaskStatus,
+  assignTask,
+  SYNC_PROVIDERS,
+  type SyncProvider,
+} from "./assistantActionsService";
+import { searchWeb, fetchWebPage } from "./assistantWebService";
 import { getPersonaInstructions } from "./personaService";
 import { contextService } from "./contextService";
 import { queryContexts } from "../vector/contextFileVectorService";
@@ -153,6 +161,14 @@ You can call MULTIPLE tools per turn. Typical chains:
 - "How do I…" → use \`navigate\` rather than walking them through clicks.
 - Aggregate questions (themes, sentiment, stats) → answer with a clear synthesis, then optionally show a bulleted list of source recordings as evidence.
 
+## External actions — preview, then request confirmation
+
+Some tools act OUTSIDE Plan AI, e.g. syncing tasks to a connected task tool (Linear, Jira, Asana, Trello, or Notion). Pick the provider from what the user asks ("send these to Jira" → provider JIRA). For these:
+1. First call the read-only preview tool (\`previewTaskSync\` with the provider) and show the user which items would be affected, as a short list.
+2. When the user wants to proceed, call \`requestTaskSync\` with the same provider. This does NOT perform the action — it shows a confirmation card with Confirm/Cancel buttons. The action only happens when the user clicks Confirm.
+3. After calling the request tool, briefly tell the user to confirm in the card. Do not claim the action is done — it isn't until they click.
+Never invent a confirmation. If the provider isn't connected (preview says so), tell the user to connect it in Integrations first.
+
 ## Available navigation paths
 
 - Dashboard: /
@@ -174,7 +190,10 @@ ${planAiKnowledge}
       const selectedModel = modelKey && modelKey.length > 0 ? modelKey : DEFAULT_AI_MODEL;
       const result = streamText({
         model: getConfiguredModel(selectedModel),
-        providerOptions: getFallbackProviderOptions(selectedModel),
+        // Reasoning tokens on: the model streams its thinking, surfaced in the
+        // UI as a collapsible "Thinking" panel (via toUIMessageStream's reasoning
+        // parts). Non-reasoning models no-op.
+        providerOptions: getReasoningProviderOptions(selectedModel),
         maxRetries: 3,
         system: systemPrompt,
         messages: await convertToModelMessages(messages),
@@ -1032,6 +1051,116 @@ ${planAiKnowledge}
                       : `/recordings/${t.id}`,
                   };
                 }),
+              };
+            },
+          }),
+          // ─── Web: search + read a page (read-only, no confirmation) ─────────
+          searchWeb: tool({
+            description:
+              "Search the open web for current information the user's meetings/documents don't " +
+              "contain (competitors, news, facts). Returns a short ranked list of results. " +
+              "Cite the sources you use.",
+            inputSchema: z.object({
+              query: z.string().describe("The search query."),
+            }),
+            execute: async ({ query }) => ({ results: await searchWeb(query) }),
+          }),
+          fetchWebPage: tool({
+            description:
+              "Fetch a web page (https URL) and return its readable text so you can answer about " +
+              "it. Use when the user shares a link or asks about a specific page. Read-only.",
+            inputSchema: z.object({
+              url: z.string().describe("The https URL to read."),
+            }),
+            execute: async ({ url }) => {
+              const page = await fetchWebPage(url);
+              return page ?? { error: "Could not read that page (unreachable or not http/https)." };
+            },
+          }),
+
+          // ─── Internal task edits (reversible, no confirmation) ──────────────
+          updateTaskStatus: tool({
+            description:
+              "Change a task's status. Statuses: BACKLOG, IN_PROGRESS, BLOCKED, COMPLETED, " +
+              "ARCHIVED. Reversible. Use listTasks first to get the task id if needed.",
+            inputSchema: z.object({
+              taskId: z.string(),
+              status: z
+                .enum(["BACKLOG", "IN_PROGRESS", "BLOCKED", "COMPLETED", "ARCHIVED"])
+                .describe("The new status."),
+            }),
+            execute: async ({ taskId, status }) => updateTaskStatus(workspaceId, taskId, status),
+          }),
+          assignTask: tool({
+            description:
+              "Assign a task to a workspace member by their email, or clear the assignee with an " +
+              "empty email. Reversible. Only members of this workspace can be assigned.",
+            inputSchema: z.object({
+              taskId: z.string(),
+              email: z
+                .string()
+                .describe("Member email to assign to. Empty string clears the assignee."),
+            }),
+            execute: async ({ taskId, email }) => assignTask(workspaceId, taskId, email || null),
+          }),
+
+          // ─── External action: sync tasks to a task tool ─────────────────────
+          // Provider-agnostic (Linear/Jira/Asana/Trello/Notion). Two tools by
+          // design: `previewTaskSync` is read-only; `requestTaskSync` is a no-op
+          // that renders a confirmation card. The write happens server-side only
+          // when the user clicks Confirm, guarded regardless of the model.
+          previewTaskSync: tool({
+            description:
+              "Read-only preview of syncing tasks to a connected task tool " +
+              `(one of: ${SYNC_PROVIDERS.join(", ")}). Shows which tasks would be created, which ` +
+              "are already synced, and the target. Does NOT create anything. Call this FIRST, " +
+              "show the user the list, and ask them to confirm. If the provider isn't connected, " +
+              "tell them to connect it in Integrations.",
+            inputSchema: z.object({
+              provider: z
+                .enum(SYNC_PROVIDERS as [SyncProvider, ...SyncProvider[]])
+                .describe("Which task tool to sync to."),
+              projectId: z
+                .string()
+                .optional()
+                .describe("Preview all tasks in this project. Omit if using taskIds."),
+              taskIds: z
+                .array(z.string())
+                .optional()
+                .describe("Specific task ids to preview. Omit to use projectId."),
+            }),
+            execute: async ({ provider, projectId, taskIds }) =>
+              previewTaskSync(workspaceId, provider, {
+                projectId: activeProject?.id ?? projectId,
+                taskIds,
+              }),
+          }),
+          requestTaskSync: tool({
+            description:
+              "Request confirmation to sync these tasks to a connected task tool. Call this after " +
+              "previewTaskSync when the user wants to proceed. It does NOT create anything — it " +
+              "renders a confirmation card with Confirm/Cancel; items are created only when the " +
+              "user clicks Confirm. After calling this, tell the user to confirm in the card above.",
+            inputSchema: z.object({
+              provider: z
+                .enum(SYNC_PROVIDERS as [SyncProvider, ...SyncProvider[]])
+                .describe("Which task tool to sync to."),
+              taskIds: z.array(z.string()).describe("Task ids to sync, from the preview."),
+            }),
+            // NO-OP that returns a confirmation request. The real, guarded write
+            // happens server-side only on the Confirm click
+            // (POST /api/chat/assistant/actions/task-sync).
+            execute: async ({ provider, taskIds }) => {
+              const preview = await previewTaskSync(workspaceId, provider, { taskIds });
+              return {
+                action: "task-sync",
+                needsConfirmation: true,
+                provider,
+                providerLabel: preview.providerLabel,
+                connected: preview.connected,
+                targetName: preview.targetName,
+                taskIds,
+                tasks: preview.tasks.filter((t) => !t.alreadySynced),
               };
             },
           }),

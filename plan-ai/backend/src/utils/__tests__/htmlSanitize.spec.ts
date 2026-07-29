@@ -282,8 +282,9 @@ describe("finalizePrototypeHtml — pestañas deterministas", () => {
 
   it("cae a una sola pantalla cuando el modelo ignora la convención", () => {
     const noScreens = finalizePrototypeHtml(
-      sanitizePrototypeHtml("<div><h1>Hola</h1><p>Contenido de una sola vista sin secciones</p></div>")!
-        .html,
+      sanitizePrototypeHtml(
+        "<div><h1>Hola</h1><p>Contenido de una sola vista sin secciones</p></div>",
+      )!.html,
       "Prototipo",
       { emptyLabel: "Pantalla" },
     );

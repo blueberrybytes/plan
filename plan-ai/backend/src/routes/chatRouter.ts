@@ -1,6 +1,18 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Router } from "express";
-import { streamText, stepCountIs, Output, type ModelMessage } from "ai";
+import {
+  streamText,
+  stepCountIs,
+  Output,
+  type ModelMessage,
+  createUIMessageStream,
+  pipeUIMessageStreamToResponse,
+} from "ai";
+import {
+  createIssuesFromTasks,
+  SYNC_PROVIDERS,
+  type SyncProvider,
+} from "../services/assistantActionsService";
 import { z } from "zod";
 import {
   getConfiguredModel,
@@ -152,7 +164,10 @@ router.post(
           const contexts = await queryContexts(thread.contextIds, content, 500);
           if (contexts && contexts.length > 0) {
             contextText = contexts.join("\n---\n");
-            toolsUsed.push("Plan AI Graph Power");
+            // Badge tells the user WHERE the answer drew from — here, their
+            // uploaded files/knowledge. "Context Library" is the feature's real
+            // name (replaces the stale "Plan AI Graph Power").
+            toolsUsed.push("Context Library");
           }
         }
 
@@ -350,7 +365,11 @@ ${contextText}
                 schema: ResponseSchema,
               }),
             }),
-        onFinish: async ({ text, reasoning, usage }) => {
+        onFinish: async ({ text, reasoningText, usage }) => {
+          // AI SDK v6: `reasoning` is an array of parts; `reasoningText` is the
+          // joined string. Using `reasoning` here stringified to "[object Object]"
+          // inside the <think> block. `reasoningText` is the human text.
+          const reasoning = reasoningText;
           try {
             if (usage) {
               aiUsageService
@@ -575,8 +594,25 @@ router.post("/assistant/stream", authenticateUser, async (req: AuthenticatedRequ
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     console.log("[ChatRouter] Starting stream iteration for assistant/stream");
+    // Reasoning is OPT-IN via ?reasoning=1 so the legacy web renderer (which
+    // doesn't parse <think>) is untouched; mobile passes the flag and shows the
+    // thinking in a collapsible panel. Same <think> wrapping as the other chat.
+    const emitReasoning = req.query.reasoning === "1";
+    let inThink = false;
     for await (const part of result.fullStream) {
-      if (part.type === "text-delta") {
+      if (emitReasoning && part.type === "reasoning-delta") {
+        if (!inThink) {
+          res.write("<think>");
+          inThink = true;
+        }
+        const p = part as { textDelta?: string; delta?: string; text?: string };
+        const content = p.textDelta ?? p.delta ?? p.text ?? "";
+        if (content) res.write(content);
+      } else if (part.type === "text-delta") {
+        if (inThink) {
+          res.write("</think>\n\n");
+          inThink = false;
+        }
         const p = part as { textDelta?: string; delta?: string; text?: string };
         const content = p.textDelta ?? p.delta ?? p.text ?? "";
         if (content) res.write(content);
@@ -617,5 +653,99 @@ router.post("/assistant/stream", authenticateUser, async (req: AuthenticatedRequ
     return res.status(500).json({ message: msg });
   }
 });
+
+// POST /api/chat/assistant/stream-ui
+//
+// The assistant over the AI SDK UI Message Stream protocol (structured text,
+// reasoning and tool parts) instead of the legacy plain-text + [UI:...] markers.
+// The frontend consumes this with `useChat`, which renders tool confirmation
+// cards and the "Thinking" panel natively. Added alongside the old
+// /assistant/stream so the migration doesn't break the current chat.
+router.post("/assistant/stream-ui", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await prisma.user.findUnique({ where: { firebaseUid: req.user.uid } });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const workspaceHeader = req.headers["x-workspace-id"];
+    const workspaceId = Array.isArray(workspaceHeader) ? workspaceHeader[0] : workspaceHeader;
+    if (!workspaceId) return res.status(400).json({ message: "Missing x-workspace-id header" });
+
+    try {
+      await requireActiveSubscription(workspaceId);
+      await checkUsageLimit(workspaceId, "llm");
+    } catch (err) {
+      if (err instanceof SubscriptionRequiredError)
+        return res.status(err.status).json({ code: err.code, message: err.message });
+      if (err instanceof UsageLimitExceededError)
+        return res.status(429).json({ message: err.message });
+      throw err;
+    }
+
+    const projectId =
+      (req.body.projectId as string) || (req.query.projectId as string) || undefined;
+    const modelKey = req.query.modelKey as string;
+
+    const result = await assistantChatService.handleAssistantStream(
+      req.body.messages,
+      user.id,
+      workspaceId,
+      modelKey,
+      projectId,
+    );
+
+    pipeUIMessageStreamToResponse({
+      response: res,
+      stream: createUIMessageStream({
+        execute: async ({ writer }) => {
+          // sendReasoning surfaces the model's thinking as reasoning parts the
+          // frontend renders in a collapsible panel.
+          await writer.merge(result.toUIMessageStream({ sendReasoning: true }));
+        },
+      }),
+    });
+  } catch (error) {
+    logger.error("Assistant UI stream error", error);
+    if (!res.headersSent) res.status(500).json({ message: "Assistant stream failed" });
+  }
+});
+
+// POST /api/chat/assistant/actions/task-sync
+//
+// The TRUSTED write behind the assistant's task-sync confirmation card, for ANY
+// provider (Linear/Jira/Asana/Trello/Notion). The card's Confirm button calls
+// this; the model can only ASK (requestTaskSync is a no-op). All the safety
+// lives in createIssuesFromTasks — workspace re-check, dedup, cap, audit — so a
+// write only happens here, authenticated and guarded, never from the model.
+router.post(
+  "/assistant/actions/task-sync",
+  authenticateUser,
+  async (req: AuthenticatedRequest, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await prisma.user.findUnique({ where: { firebaseUid: req.user.uid } });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const workspaceHeader = req.headers["x-workspace-id"];
+    const workspaceId = Array.isArray(workspaceHeader) ? workspaceHeader[0] : workspaceHeader;
+    if (!workspaceId) return res.status(400).json({ message: "Missing x-workspace-id header" });
+
+    const provider = req.body.provider as SyncProvider;
+    if (!SYNC_PROVIDERS.includes(provider)) {
+      return res.status(400).json({ message: "Unknown provider" });
+    }
+    const taskIds: string[] = Array.isArray(req.body.taskIds) ? req.body.taskIds : [];
+    if (!taskIds.length) return res.status(400).json({ message: "No task ids provided" });
+
+    try {
+      const outcome = await createIssuesFromTasks(workspaceId, user.id, provider, taskIds);
+      return res.json(outcome);
+    } catch (err) {
+      logger.error("Task sync action failed", err);
+      return res.status(500).json({ message: "Failed to sync tasks" });
+    }
+  },
+);
 
 export default router;

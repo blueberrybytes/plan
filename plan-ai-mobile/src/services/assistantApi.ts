@@ -19,7 +19,9 @@ export const streamAssistantMessage = async (
   projectId?: string,
 ) => {
   try {
-    const url = `${BASE_URL}/api/chat/assistant/stream`;
+    // reasoning=1 opts into the model's streamed thinking, wrapped in
+    // <think>…</think>, which the screen shows in a collapsible panel.
+    const url = `${BASE_URL}/api/chat/assistant/stream?reasoning=1`;
     
     const response = await fetch(url, {
       method: "POST",
