@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   Animated,
+  AppState,
 } from "react-native";
 import {
   Text,
@@ -163,6 +164,22 @@ export default function AssistantScreen() {
       console.error("Dictation stop Error:", err);
     }
   };
+
+  // Keep the latest stopDictation reachable from the mount-once AppState
+  // listener below, without resubscribing on every render.
+  const stopDictationRef = useRef(stopDictation);
+  stopDictationRef.current = stopDictation;
+
+  // Backgrounding the app suspends the mic at the OS level anyway — so proactively
+  // close the stream and drop the "Listening" state, so it never sits open while
+  // the app is hidden. We abort: trailing interim words are discarded (finals are
+  // already in the input box).
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "background") stopDictationRef.current(true);
+    });
+    return () => sub.remove();
+  }, []);
 
   const handleDictate = async () => {
     if (isDictating) {
@@ -523,16 +540,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   composer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 18,
+    paddingTop: 14,
     // backgroundColor, borderTopColor, borderTopWidth, paddingBottom are
     // applied inline (theme + active dictation state).
   },
   listeningBanner: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 10,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
     gap: 6,
   },
   listeningHeader: {
@@ -559,12 +576,13 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 14,
     backgroundColor: "transparent",
-    maxHeight: 100,
+    maxHeight: 120,
   },
   textInputContent: {
-    paddingRight: 8, // internal text → box edge clearance (send-button collision fix)
+    paddingRight: 12, // internal text → box edge clearance (send-button collision fix)
+    paddingVertical: 6, // vertical breathing room so multiline text isn't cramped
   },
   sendButton: {
     marginBottom: 4,
