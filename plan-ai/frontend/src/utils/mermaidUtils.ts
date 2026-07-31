@@ -147,6 +147,33 @@ export const injectMermaidThemeStyles = (svg: string, options: MermaidThemeOptio
 };
 
 /**
+ * A Gantt task whose start and end dates are IDENTICAL has zero duration, so
+ * Mermaid draws a zero-WIDTH (invisible) bar — only the floating label survives.
+ * AI "milestone chronologies" emit these constantly (`:done, 2026-06-05,
+ * 2026-06-05`), producing a chart that reads as mostly-blank with unreadable
+ * orphan labels. Rewrite each same-day task to a real `milestone` so it renders
+ * as a visible diamond at that date.
+ *
+ * Only same-day date PAIRS are touched. Real-duration tasks (different dates),
+ * `after`-dependencies, duration tasks (`5d`/`2w`) and non-task lines
+ * (section/title/dateFormat) all pass through untouched — verified against the
+ * live renderer before shipping.
+ */
+export const normalizeGanttMilestones = (chart: string): string =>
+  chart
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => {
+      // group 1: indent + task name + ":"  |  optional status/id prefix (skipped)
+      // groups 2,3: the two ISO dates. Convert only when they're equal.
+      const m = line.match(
+        /^(\s*[^:\n]+:)\s*(?:[a-zA-Z, ]*?,\s*)?(\d{4}-\d{2}-\d{2})\s*,\s*(\d{4}-\d{2}-\d{2})\s*$/,
+      );
+      return m && m[2] === m[3] ? `${m[1]} milestone, ${m[2]}, 0d` : line;
+    })
+    .join("\n");
+
+/**
  * Auto-patches common AI generation syntax errors in Mermaid charts.
  *
  * Wraps node labels that contain delimiter-breaking characters in double quotes
@@ -169,6 +196,10 @@ export const repairMermaidSyntax = (chart: string): string => {
   // flowcharts; pass known non-flowchart types through untouched. Unknown
   // (null) types keep the old behaviour to avoid regressing edge cases.
   const detectedType = detectMermaidType(chart);
+  // Gantt has its own grammar — the flowchart label repairs below would corrupt
+  // it. It gets one targeted fix instead: collapse zero-duration tasks into
+  // visible milestones (the #1 reason AI Gantts render mostly-blank).
+  if (detectedType === "GANTT") return normalizeGanttMilestones(chart);
   if (detectedType && detectedType !== "FLOWCHART") return chart;
 
   // Chars that break an UNQUOTED node label and therefore force quoting.
