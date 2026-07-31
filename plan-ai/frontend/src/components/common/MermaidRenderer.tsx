@@ -110,6 +110,34 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         const constScale = (prefix: string, n: number, value: string, from = 0) =>
           Object.fromEntries(Array.from({ length: n }, (_, i) => [`${prefix}${from + i}`, value]));
 
+        // Blend two hex colours → hex. Mermaid ignores rgb()/rgba() (see hx above),
+        // so MUI's lighten/darken — which return rgb() — are unusable here; this keeps
+        // everything hex. Used to derive an on-brand Gantt palette that stays legible
+        // whatever the brand's secondary colour happens to be.
+        const mix = (a: string, b: string, t: number): string => {
+          const rgb = (h: string) => {
+            const s = h.replace("#", "");
+            const v = s.length === 3 ? s.replace(/./g, "$&$&") : s;
+            return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16));
+          };
+          const [r1, g1, b1] = rgb(a);
+          const [r2, g2, b2] = rgb(b);
+          const ch = (x: number, y: number) =>
+            Math.round(x + (y - x) * t)
+              .toString(16)
+              .padStart(2, "0");
+          return `#${ch(r1, r2)}${ch(g1, g2)}${ch(b1, b2)}`;
+        };
+        // On-brand Gantt tints, derived from primary / background / ink — NEVER from
+        // the brand secondary. A light secondary was washing "done" tasks, grid lines
+        // and borders to near-invisibility, which read as "the red theme isn't applied".
+        const ganttDoneBkg = mix(primHex, bgHex, isDark ? 0.5 : 0.42); // lighter brand tint = "past"
+        const ganttDoneBorder = mix(primHex, bgHex, 0.3);
+        const ganttActiveBorder = mix(primHex, isDark ? "#ffffff" : "#000000", 0.28);
+        const ganttBand = mix(primHex, bgHex, isDark ? 0.14 : 0.05); // faint section banding
+        const ganttGrid = mix(txt, bgHex, 0.78); // always-visible faint grid
+        const ganttCrit = "#f59e0b"; // amber — must read apart from brand red
+
         // theme: 'base' is the ONLY customizable theme — themeVariables apply
         // fully here (they were largely ignored on default/dark before, which
         // is why everything was force-painted via injected CSS). darkMode drives
@@ -187,23 +215,25 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
             relationLabelBackground: bgHex,
             relationLabelColor: txt,
 
-            // ── Gantt ──
-            sectionBkgColor: bgHex,
+            // ── Gantt (tints derived above, NOT from the brand secondary, so a
+            //     light secondary can't wash "done" tasks / grid / borders out —
+            //     the reported "red theme isn't applied" bug) ──
+            sectionBkgColor: ganttBand,
             sectionBkgColor2: bgHex,
             altSectionBkgColor: bgHex,
             taskBkgColor: primHex,
-            taskBorderColor: secHex,
+            taskBorderColor: ganttActiveBorder,
             taskTextColor: nodeTxt,
             taskTextLightColor: txt,
             taskTextDarkColor: txt,
             taskTextOutsideColor: txt,
             activeTaskBkgColor: primHex,
-            activeTaskBorderColor: secHex,
-            doneTaskBkgColor: secHex,
-            doneTaskBorderColor: secHex,
-            critBkgColor: secHex,
-            critBorderColor: secHex,
-            gridColor: secHex,
+            activeTaskBorderColor: ganttActiveBorder,
+            doneTaskBkgColor: ganttDoneBkg,
+            doneTaskBorderColor: ganttDoneBorder,
+            critBkgColor: ganttCrit,
+            critBorderColor: mix(ganttCrit, "#000000", 0.2),
+            gridColor: ganttGrid,
             todayLineColor: primHex,
 
             // ── Quadrant (the transparent square fill stays in residual CSS) ──
@@ -263,6 +293,18 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
           },
           flowchart: { htmlLabels: true, useMaxWidth: true },
           sequence: { wrap: true, showSequenceNumbers: false },
+          // Gantt geometry: bigger bars + labels so a long chronology stays legible,
+          // and fit to the container width (the default 11px text rendered tiny).
+          gantt: {
+            useMaxWidth: true,
+            fontSize: 14,
+            sectionFontSize: 14,
+            barHeight: 24,
+            barGap: 6,
+            topPadding: 48,
+            leftPadding: 96,
+            gridLineStartPadding: 32,
+          },
           // Per-diagram colour config (these colours are NOT themeVariables).
           er: { fill: primHex, stroke: secHex } as any,
           sankey: { linkColor: primHex } as any,
