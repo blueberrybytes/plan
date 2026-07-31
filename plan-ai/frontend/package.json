@@ -96,7 +96,7 @@
     "jspdf": "^4.2.0",
     "jszip": "^3.10.1",
     "konva": "8",
-    "mermaid": "^11.14.0",
+    "mermaid": "^11.16.0",
     "papaparse": "^5.5.3",
     "pptxgenjs": "3.12.0",
     "react": "18",

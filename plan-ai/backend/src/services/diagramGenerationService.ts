@@ -304,7 +304,7 @@ The very first character of your response MUST be the start of the Mermaid synta
 ## Guidelines per type:
 - FLOWCHART: Use 'flowchart TD' or 'flowchart LR'.
 - SEQUENCE: Use 'sequenceDiagram'.
-- GANTT: Use 'gantt' and define axes and formats clearly.
+- GANTT: Use 'gantt'. Begin with 'dateFormat YYYY-MM-DD' and a readable 'axisFormat' (e.g. '%b %Y'). Group tasks under 2–5 'section' headings, ~4–6 items each. Give every task a realistic BOUNDED duration (e.g. '2w', '5d') or use 'milestone' for point-in-time events — NEVER let a single task span the whole timeline (it dwarfs everything else). Prefer 'after <taskId>' to sequence work so bars and labels don't overlap. Mark finished work 'done', current work 'active', blockers 'crit'. Examples: 'Diseño, done, 2026-01-05, 2w' and 'Lanzamiento, milestone, 2026-03-01, 0d'.
 - MINDMAP: Use 'mindmap'.
 - CLASS: Use 'classDiagram'.
 - ER: Use 'erDiagram'.

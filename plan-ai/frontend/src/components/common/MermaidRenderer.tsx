@@ -131,10 +131,17 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         // On-brand Gantt tints, derived from primary / background / ink — NEVER from
         // the brand secondary. A light secondary was washing "done" tasks, grid lines
         // and borders to near-invisibility, which read as "the red theme isn't applied".
-        const ganttDoneBkg = mix(primHex, bgHex, isDark ? 0.5 : 0.42); // lighter brand tint = "past"
+        // Mermaid renders DONE (and active) task labels with `taskTextDarkColor`
+        // (verified in gantt/styles: `.doneText*{fill:taskTextDarkColor}`), which we
+        // set to `txt` — the background-contrast ink (dark on light, light on dark).
+        // So the done bar must be a LIGHT tint on a light bg (dark label reads at
+        // CR ~6) and a DARK shade on a dark bg (light label reads) — exactly what
+        // mixing toward the background gives. A deep red here would sink the dark
+        // label to CR ~3. "Lighter = past/done" also matches the usual Gantt reading.
+        const ganttDoneBkg = mix(primHex, bgHex, isDark ? 0.5 : 0.42);
         const ganttDoneBorder = mix(primHex, bgHex, 0.3);
         const ganttActiveBorder = mix(primHex, isDark ? "#ffffff" : "#000000", 0.28);
-        const ganttBand = mix(primHex, bgHex, isDark ? 0.14 : 0.05); // faint section banding
+        const ganttBand = mix(primHex, bgHex, isDark ? 0.85 : 0.95); // faint section banding (mostly bg)
         const ganttGrid = mix(txt, bgHex, 0.78); // always-visible faint grid
         const ganttCrit = "#f59e0b"; // amber — must read apart from brand red
 
