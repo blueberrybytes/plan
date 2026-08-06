@@ -988,8 +988,14 @@ export class ProjectTranscriptService {
         extractionReasoning: analysisRaw.chainOfThought ?? null,
         principalSpeaker,
         // Speakers tab fuel — empty array when there are no diarized
-        // utterances (text-only transcripts).
-        speakers: speakerInsights,
+        // utterances (text-only transcripts). Human name corrections
+        // (metadata.speakerNameOverrides) are re-applied over the fresh AI pass
+        // so a reprocess never silently undoes what a user fixed by hand.
+        speakers: speakerInsights.map((s) => {
+          const override = (currentMetadata as { speakerNameOverrides?: Record<string, string> })
+            .speakerNameOverrides?.[s.label];
+          return override ? { ...s, identifiedName: override } : s;
+        }),
         aiGraphTrace: {
           nodes: transcriptGraphNodes,
           links: transcriptGraphLinks,
@@ -1921,16 +1927,39 @@ ${content}`;
       speakers: z.array(SpeakerSchema),
     });
 
+    // Known-people vocabulary: the workspace's member names. Speech-to-text
+    // renders names phonetically ("Naila" for Nayla), and the LLM then invents
+    // a spelling. Most meetings are with the same team, so feeding the CORRECT
+    // spellings as candidates fixes the majority of misspellings at the source.
+    // Best-effort — an empty list simply omits the block.
+    let knownPeopleBlock = "";
+    try {
+      const members = await prisma.workspaceMember.findMany({
+        where: { workspaceId },
+        select: { user: { select: { name: true } } },
+        take: 50,
+      });
+      const names = members
+        .map((m) => m.user?.name?.trim())
+        .filter((n): n is string => !!n && n.length > 1);
+      if (names.length > 0) {
+        knownPeopleBlock = `\nKNOWN WORKSPACE MEMBERS (correct spellings): ${[...new Set(names)].join(", ")}.\nWhen a name heard in the transcript phonetically matches one of these, use THIS spelling (e.g. transcript says "Naila" but the member list has "Nayla" → output "Nayla").\n`;
+      }
+    } catch {
+      // Non-fatal: identification simply runs without the vocabulary.
+    }
+
     const prompt = `You are analyzing a diarized meeting transcript. The audio model labeled speakers as "${speakerLabels.join('", "')}" (these are anonymous labels).
 
 Your job: for EACH label, infer the real person's name (only if mentioned in the conversation), their role, a one-sentence summary of their contribution, up to 3 representative quotes, and an overall sentiment.
-
+${knownPeopleBlock}
 CRITICAL RULES:
 1. Use the EXACT label string in your output — don't rename "Speaker 0" → "Speaker 1".
 2. Only set identifiedName when you're confident (someone says "Hi <name>", "<name> mentioned…", they introduce themselves, etc.). Otherwise set null.
 3. Don't invent quotes — paste verbatim from the transcript.
-4. Don't invent names that aren't in the transcript.
+4. Don't invent names that aren't in the transcript. Correcting the SPELLING of a heard name to a known workspace member is allowed and encouraged; adding a person nobody addressed is not.
 5. Output exactly one entry per label, even if the speaker barely talked.
+6. NEVER assign the same identifiedName to two different labels unless the transcript truly shows the same person split across labels.
 
 TRANSCRIPT (label-prefixed):
 ${transcriptForLLM}`;

@@ -69,7 +69,8 @@ describe("normalizeGanttMilestones — zero-duration tasks become visible milest
   });
 
   it("never disturbs non-task lines", () => {
-    const header = "gantt\n    dateFormat YYYY-MM-DD\n    title Cronología\n    section Fase Inicial";
+    const header =
+      "gantt\n    dateFormat YYYY-MM-DD\n    title Cronología\n    section Fase Inicial";
     expect(normalizeGanttMilestones(header)).toBe(header);
   });
 

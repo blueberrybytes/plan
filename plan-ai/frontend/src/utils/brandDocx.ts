@@ -31,6 +31,7 @@ import { saveAs } from "file-saver";
 export interface BrandDocxTheme {
   name?: string | null;
   primaryColor?: string | null;
+  secondaryColor?: string | null;
   textColor?: string | null;
   headingFont?: string | null;
   bodyFont?: string | null;
@@ -62,6 +63,12 @@ const isLightOnWhite = (h: string): boolean => {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6;
 };
 
+/** Chroma proxy 0..1 (bare hex): how far from grey the colour is. */
+const saturation = (h: string): number => {
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+};
+
 /** points → half-points (docx unit). */
 const hp = (pt: number) => Math.round(pt * 2);
 
@@ -69,6 +76,8 @@ const GREY = "666666";
 
 interface ResolvedStyle {
   primary: string;
+  /** The heading colour: the primary, or the secondary when the primary is a neutral grey. */
+  accent: string;
   h1: string;
   h2: string;
   h3: string;
@@ -86,11 +95,22 @@ const resolveStyle = (theme: BrandDocxTheme): ResolvedStyle => {
   const primary = isLightOnWhite(rawPrimary) ? mix(rawPrimary, "000000", 0.45) : rawPrimary;
   const rawInk = bare(theme.textColor, "1a1a1a");
   const ink = isLightOnWhite(rawInk) ? "1a1a1a" : rawInk;
+
+  // Heading ACCENT. Deriving headings from the primary alone fails for brands
+  // whose primary is a neutral (e.g. #3c3c3c with an orange secondary): the doc
+  // came out all-grey and read as "the colours weren't applied". When the
+  // primary carries no chroma, the secondary is where the visible brand colour
+  // lives — use it. A colourful primary keeps today's behaviour untouched.
+  const rawSecondary = bare(theme.secondaryColor, rawPrimary);
+  const secondary = isLightOnWhite(rawSecondary) ? mix(rawSecondary, "000000", 0.45) : rawSecondary;
+  const accent = saturation(primary) < 0.15 && saturation(secondary) >= 0.15 ? secondary : primary;
+
   return {
     primary,
-    h1: primary,
-    h2: mix(primary, "ffffff", 0.15),
-    h3: mix(primary, "ffffff", 0.32),
+    accent,
+    h1: accent,
+    h2: mix(accent, "ffffff", 0.15),
+    h3: mix(accent, "ffffff", 0.32),
     ink,
     headingFont: theme.headingFont?.trim() || "Inter",
     bodyFont: theme.bodyFont?.trim() || "Inter",
@@ -222,7 +242,38 @@ const imgTypeFor = (url: string, contentType: string | null): ImgType | null => 
 interface LogoData {
   data: ArrayBuffer;
   type: ImgType;
+  /** Natural pixel size, when decodable — drives aspect-correct placement. */
+  width?: number;
+  height?: number;
 }
+
+/** Header box the logo must fit in (points ≈ px here): max 40 tall, 150 wide. */
+const LOGO_MAX_H = 40;
+const LOGO_MAX_W = 150;
+
+/**
+ * Fit natural dimensions into the header box PRESERVING aspect ratio. A wide
+ * logo (icon + wordmark) forced into a 40×40 square renders visibly squashed —
+ * the reported distortion. Unknown dimensions fall back to the old square.
+ */
+const fitLogo = (w?: number, h?: number): { width: number; height: number } => {
+  if (!w || !h || w <= 0 || h <= 0) return { width: LOGO_MAX_H, height: LOGO_MAX_H };
+  const scale = Math.min(LOGO_MAX_H / h, LOGO_MAX_W / w);
+  return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
+};
+
+/** Decode natural pixel size of an image blob in the browser. Null off-DOM. */
+const decodeDimensions = async (blob: Blob): Promise<{ w: number; h: number } | null> => {
+  if (typeof createImageBitmap === "undefined") return null;
+  try {
+    const bmp = await createImageBitmap(blob);
+    const dims = { w: bmp.width, h: bmp.height };
+    bmp.close();
+    return dims;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Rasterize any browser-decodable image blob (SVG, webp, …) to PNG bytes via
@@ -230,7 +281,9 @@ interface LogoData {
  * This is what lets an SVG logo (the common case for website-imported themes)
  * still appear in the .docx header — ImageRun cannot embed SVG directly.
  */
-const rasterizeToPng = async (blob: Blob): Promise<ArrayBuffer | null> => {
+const rasterizeToPng = async (
+  blob: Blob,
+): Promise<{ data: ArrayBuffer; width: number; height: number } | null> => {
   if (typeof document === "undefined") return null;
   const url = URL.createObjectURL(blob);
   try {
@@ -250,7 +303,7 @@ const rasterizeToPng = async (blob: Blob): Promise<ArrayBuffer | null> => {
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, w, h);
     const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    return png ? await png.arrayBuffer() : null;
+    return png ? { data: await png.arrayBuffer(), width: w, height: h } : null;
   } catch {
     return null;
   } finally {
@@ -269,9 +322,13 @@ const fetchLogo = async (logoUrl?: string | null): Promise<LogoData | null> => {
     const res = await fetch(logoUrl);
     if (!res.ok) return null;
     const type = imgTypeFor(logoUrl, res.headers.get("content-type"));
-    if (type) return { data: await res.arrayBuffer(), type };
+    if (type) {
+      const blob = await res.blob();
+      const dims = await decodeDimensions(blob);
+      return { data: await blob.arrayBuffer(), type, width: dims?.w, height: dims?.h };
+    }
     const png = await rasterizeToPng(await res.blob());
-    return png ? { data: png, type: "png" } : null;
+    return png ? { data: png.data, type: "png", width: png.width, height: png.height } : null;
   } catch {
     return null;
   }
@@ -361,7 +418,8 @@ const inlineRuns = (text: string, font: string, color?: string): TextRun[] => {
   return runs.length ? runs : [new TextRun({ text: "", font, color })];
 };
 
-const isTableSeparator = (line: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+const isTableSeparator = (line: string) =>
+  /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
 const splitRow = (line: string) =>
   line
     .trim()
@@ -392,7 +450,14 @@ const buildTable = (rows: string[][], s: ResolvedStyle): Table => {
           ),
         }),
     ),
-    borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
+    borders: {
+      top: border,
+      bottom: border,
+      left: border,
+      right: border,
+      insideHorizontal: border,
+      insideVertical: border,
+    },
   });
 };
 

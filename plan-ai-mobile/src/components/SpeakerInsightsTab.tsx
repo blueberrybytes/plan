@@ -1,6 +1,17 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import { Surface, Text, Chip, Avatar, useTheme } from "react-native-paper";
+import React, { useState } from "react";
+import { View, StyleSheet, Alert } from "react-native";
+import {
+  Surface,
+  Text,
+  Chip,
+  Avatar,
+  useTheme,
+  IconButton,
+  Portal,
+  Dialog,
+  TextInput,
+  Button,
+} from "react-native-paper";
 
 export interface SpeakerInsight {
   label: string;
@@ -17,6 +28,12 @@ export interface SpeakerInsight {
 interface Props {
   speakers?: SpeakerInsight[] | null;
   principalSpeakerLabel?: string | null;
+  /**
+   * Persist a corrected speaker name (blank clears the identification).
+   * When provided, each speaker card shows a pencil icon that opens an
+   * edit dialog. The parent owns the API call and transcript state update.
+   */
+  onRenameSpeaker?: (label: string, name: string) => Promise<void>;
 }
 
 const formatDuration = (seconds: number): string => {
@@ -36,8 +53,43 @@ const initialsFor = (name: string | null, label: string): string => {
   return label.slice(0, 2).toUpperCase();
 };
 
-const SpeakerInsightsTab: React.FC<Props> = ({ speakers, principalSpeakerLabel }) => {
+const SpeakerInsightsTab: React.FC<Props> = ({
+  speakers,
+  principalSpeakerLabel,
+  onRenameSpeaker,
+}) => {
   const theme = useTheme();
+  const [editingSpeaker, setEditingSpeaker] = useState<SpeakerInsight | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const openEditor = (s: SpeakerInsight) => {
+    setDraftName(s.identifiedName ?? "");
+    setEditingSpeaker(s);
+  };
+
+  const closeEditor = () => {
+    if (isSaving) return;
+    setEditingSpeaker(null);
+  };
+
+  const handleSave = async () => {
+    if (!editingSpeaker || !onRenameSpeaker || isSaving) return;
+    setIsSaving(true);
+    try {
+      await onRenameSpeaker(editingSpeaker.label, draftName.trim());
+      setEditingSpeaker(null);
+    } catch (e) {
+      Alert.alert(
+        "Error",
+        e instanceof Error && e.message
+          ? e.message
+          : "Could not update the speaker name. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!speakers || speakers.length === 0) {
     return (
@@ -93,6 +145,16 @@ const SpeakerInsightsTab: React.FC<Props> = ({ speakers, principalSpeakerLabel }
                   <Text variant="titleMedium" style={{ fontWeight: "700" }}>
                     {displayName}
                   </Text>
+                  {onRenameSpeaker ? (
+                    <IconButton
+                      icon="pencil-outline"
+                      size={16}
+                      style={styles.editIcon}
+                      iconColor={theme.colors.onSurfaceVariant}
+                      accessibilityLabel={`Edit name for ${displayName}`}
+                      onPress={() => openEditor(s)}
+                    />
+                  ) : null}
                   {!s.identifiedName && (
                     <Chip compact mode="outlined" style={styles.chip}>
                       unidentified
@@ -161,6 +223,49 @@ const SpeakerInsightsTab: React.FC<Props> = ({ speakers, principalSpeakerLabel }
           </Surface>
         );
       })}
+
+      {onRenameSpeaker ? (
+        <Portal>
+          <Dialog visible={editingSpeaker !== null} onDismiss={closeEditor}>
+            <Dialog.Title style={{ color: theme.colors.onSurface }}>
+              Edit speaker name
+            </Dialog.Title>
+            <Dialog.Content>
+              <TextInput
+                mode="outlined"
+                label="Name"
+                value={draftName}
+                onChangeText={setDraftName}
+                placeholder={editingSpeaker?.label}
+                autoFocus
+                disabled={isSaving}
+                returnKeyType="done"
+                onSubmitEditing={handleSave}
+              />
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}
+              >
+                Leave blank to clear the name and show &quot;
+                {editingSpeaker?.label ?? ""}&quot; again.
+              </Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={closeEditor} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleSave}
+                loading={isSaving}
+                disabled={isSaving}
+              >
+                Save
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      ) : null}
     </View>
   );
 };
@@ -184,6 +289,10 @@ const styles = StyleSheet.create({
   },
   chip: {
     height: 24,
+  },
+  editIcon: {
+    margin: 0,
+    marginLeft: -4,
   },
   quote: {
     borderLeftWidth: 3,

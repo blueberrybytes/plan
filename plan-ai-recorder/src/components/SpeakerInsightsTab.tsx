@@ -6,26 +6,35 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
+  IconButton,
   Stack,
+  TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
-import { Person as PersonIcon, FormatQuote as QuoteIcon } from "@mui/icons-material";
+import {
+  Person as PersonIcon,
+  FormatQuote as QuoteIcon,
+  Edit as EditIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+} from "@mui/icons-material";
+import type { components } from "../types/api";
 
-export interface SpeakerInsight {
-  label: string;
-  identifiedName: string | null;
-  role?: string | null;
-  isPrincipalSpeaker: boolean;
-  summary: string;
-  keyQuotes?: string[];
-  sentiment?: "POSITIVE" | "NEUTRAL" | "NEGATIVE" | "MIXED";
-  speakingTimeSeconds: number;
-  utteranceCount: number;
-}
+// Sourced from the generated backend swagger — never hand-write this shape.
+export type SpeakerInsight = components["schemas"]["SpeakerInsight"];
 
 interface SpeakerInsightsTabProps {
   speakers?: SpeakerInsight[] | null;
   principalSpeakerLabel?: string | null;
+  /**
+   * Called when the user confirms an inline rename with (diarization label,
+   * corrected name). A blank name clears the identification. Should PUT the
+   * override to the backend and update the transcript state; a rejection is
+   * surfaced inline next to the input. Omit to hide the edit buttons.
+   */
+  onRenameSpeaker?: (label: string, name: string) => Promise<void>;
 }
 
 const SENTIMENT_COLOR: Record<
@@ -58,7 +67,44 @@ const initialsFor = (name: string | null, label: string): string => {
 const SpeakerInsightsTab: React.FC<SpeakerInsightsTabProps> = ({
   speakers,
   principalSpeakerLabel,
+  onRenameSpeaker,
 }) => {
+  // Inline speaker-name editing. Keyed by the stable diarization label so at
+  // most one row is in edit mode at a time.
+  const [editingLabel, setEditingLabel] = React.useState<string | null>(null);
+  const [editValue, setEditValue] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [editError, setEditError] = React.useState<string | null>(null);
+
+  const startEditing = (s: SpeakerInsight) => {
+    setEditingLabel(s.label);
+    setEditValue(s.identifiedName ?? "");
+    setEditError(null);
+  };
+
+  const cancelEditing = () => {
+    if (saving) return;
+    setEditingLabel(null);
+    setEditError(null);
+  };
+
+  const confirmEditing = async () => {
+    if (editingLabel === null || !onRenameSpeaker || saving) return;
+    setSaving(true);
+    setEditError(null);
+    try {
+      // Blank clears the identification (backend contract).
+      await onRenameSpeaker(editingLabel, editValue.trim());
+      setEditingLabel(null);
+    } catch (err) {
+      setEditError(
+        err instanceof Error ? err.message : "Failed to update speaker name",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!speakers || speakers.length === 0) {
     return (
       <Alert severity="info">
@@ -102,9 +148,77 @@ const SpeakerInsightsTab: React.FC<SpeakerInsightsTabProps> = ({
                     flexWrap="wrap"
                     sx={{ mb: 0.5 }}
                   >
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      {displayName}
-                    </Typography>
+                    {editingLabel === s.label ? (
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <TextField
+                          size="small"
+                          variant="standard"
+                          autoFocus
+                          value={editValue}
+                          placeholder={s.label}
+                          disabled={saving}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void confirmEditing();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelEditing();
+                            }
+                          }}
+                          inputProps={{ "aria-label": "Speaker name" }}
+                          sx={{ width: 180, "& input": { fontWeight: 700 } }}
+                        />
+                        <Tooltip title="Save name (Enter)">
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="success"
+                              disabled={saving}
+                              onClick={() => void confirmEditing()}
+                              aria-label="Save speaker name"
+                            >
+                              {saving ? (
+                                <CircularProgress size={14} color="inherit" />
+                              ) : (
+                                <CheckIcon sx={{ fontSize: 16 }} />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Cancel (Esc)">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={saving}
+                              onClick={cancelEditing}
+                              aria-label="Cancel editing speaker name"
+                            >
+                              <CloseIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    ) : (
+                      <>
+                        <Typography variant="subtitle1" fontWeight={700}>
+                          {displayName}
+                        </Typography>
+                        {onRenameSpeaker && (
+                          <Tooltip title="Edit name">
+                            <IconButton
+                              size="small"
+                              onClick={() => startEditing(s)}
+                              aria-label={`Edit name for ${displayName}`}
+                              sx={{ p: 0.25, color: "text.secondary" }}
+                            >
+                              <EditIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </>
+                    )}
                     {!s.identifiedName && (
                       <Chip
                         label="unidentified"
@@ -139,6 +253,15 @@ const SpeakerInsightsTab: React.FC<SpeakerInsightsTabProps> = ({
                       />
                     )}
                   </Stack>
+                  {editingLabel === s.label && editError && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ display: "block", mb: 0.5 }}
+                    >
+                      {editError}
+                    </Typography>
+                  )}
                   <Typography
                     variant="caption"
                     color="text.secondary"

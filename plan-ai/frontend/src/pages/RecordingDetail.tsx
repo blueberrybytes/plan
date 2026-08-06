@@ -759,6 +759,7 @@ const RecordingDetail: React.FC = () => {
                 {tabValue === "speakers" && (
                   <Box sx={{ p: { xs: 0, md: 2 } }}>
                     <SpeakerInsightsTab
+                      transcriptId={recordingId ?? null}
                       speakers={
                         (
                           transcript.data?.metadata as {

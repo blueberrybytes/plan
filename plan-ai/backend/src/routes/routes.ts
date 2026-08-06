@@ -770,6 +770,11 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "Record_string.string_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{},"additionalProperties":{"dataType":"string"},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "PostMeetingTaskStatus": {
         "dataType": "refObject",
         "properties": {
@@ -803,6 +808,7 @@ const models: TsoaRoute.Models = {
             "rawTasks": {"dataType":"array","array":{"dataType":"any"}},
             "principalSpeaker": {"dataType":"string"},
             "speakers": {"dataType":"array","array":{"dataType":"refObject","ref":"SpeakerInsight"}},
+            "speakerNameOverrides": {"ref":"Record_string.string_"},
             "postMeetingTasks": {"ref":"PostMeetingTasksRecord"},
         },
         "additionalProperties": false,
@@ -919,6 +925,14 @@ const models: TsoaRoute.Models = {
             "transcript": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}]},
             "metadata": {"dataType":"union","subSchemas":[{"ref":"TsoaJsonObject"},{"dataType":"enum","enums":[null]}]},
             "recordedAt": {"dataType":"union","subSchemas":[{"dataType":"datetime"},{"dataType":"enum","enums":[null]}]},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "UpdateSpeakerNamesBody": {
+        "dataType": "refObject",
+        "properties": {
+            "overrides": {"ref":"Record_string.string_","required":true},
         },
         "additionalProperties": false,
     },
@@ -3988,6 +4002,39 @@ export function RegisterRoutes(app: Router,opts?:{multer?:ReturnType<typeof mult
 
               await templateService.apiHandler({
                 methodName: 'updateTranscript',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTranscriptsController_updateTranscriptSpeakers: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                id: {"in":"path","name":"id","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"UpdateSpeakerNamesBody"},
+        };
+        app.put('/api/transcripts/:id/speakers',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TranscriptsController)),
+            ...(fetchMiddlewares<RequestHandler>(TranscriptsController.prototype.updateTranscriptSpeakers)),
+
+            async function TranscriptsController_updateTranscriptSpeakers(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTranscriptsController_updateTranscriptSpeakers, request, response });
+
+                const controller = new TranscriptsController();
+
+              await templateService.apiHandler({
+                methodName: 'updateTranscriptSpeakers',
                 controller,
                 response,
                 next,

@@ -1252,6 +1252,12 @@
       "stats": "Key Stats"
     }
   },
+  "transcripts": {
+    "speakers": {
+      "editName": "Edit name",
+      "updateFailed": "Couldn't save the name. Please try again."
+    }
+  },
   "recordings": {
     "subtitle": "Your captured recordings and standalone transcripts."
   },

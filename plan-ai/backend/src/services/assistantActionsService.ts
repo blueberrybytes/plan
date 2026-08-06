@@ -226,7 +226,9 @@ export const SYNC_PROVIDERS = Object.keys(ADAPTERS) as SyncProvider[];
 
 const isSynced = (task: { metadata: Prisma.JsonValue }, metaKey: MetaKey): boolean => {
   const meta = task.metadata as unknown as TaskMetadata;
-  const entry = meta?.[metaKey] as { issueId?: string; taskGid?: string; cardId?: string; pageId?: string } | undefined;
+  const entry = meta?.[metaKey] as
+    | { issueId?: string; taskGid?: string; cardId?: string; pageId?: string }
+    | undefined;
   return Boolean(entry?.issueId || entry?.taskGid || entry?.cardId || entry?.pageId);
 };
 

@@ -23,6 +23,7 @@ export type DocDocumentResponse    = components['schemas']['DocDocumentResponse'
 export type UserResponse           = components['schemas']['UserResponse'];
 export type CreateStandaloneTranscriptBody = components['schemas']['CreateStandaloneTranscriptBody'];
 export type SubscriptionStatusResponse = components['schemas']['SubscriptionStatusResponse'];
+export type UpdateSpeakerNamesBody = components['schemas']['UpdateSpeakerNamesBody'];
 
 let rawBaseUrl = process.env.EXPO_PUBLIC_PLAN_AI_API_URL ?? "http://localhost:8080";
 if (__DEV__ && Platform.OS === 'android') {
@@ -585,6 +586,27 @@ export const createPlanAiApi = (
           method: "PUT",
           headers: await getAuthHeaders(force),
           body: JSON.stringify(payload),
+        });
+
+      const res = await req(false);
+      return handleResponseWithRetry<Transcript>(res, () => req(true));
+    },
+
+    /**
+     * Correct AI-inferred speaker names. `overrides` maps the stable diarization
+     * label ("Speaker 0", "User 1") to the corrected human name; a blank value
+     * clears the identification. Returns the updated transcript.
+     */
+    async updateTranscriptSpeakers(
+      id: string,
+      overrides: UpdateSpeakerNamesBody["overrides"],
+    ): Promise<Transcript> {
+      const body: UpdateSpeakerNamesBody = { overrides };
+      const req = async (force: boolean) =>
+        safeFetch(`${BASE_URL}/api/transcripts/${id}/speakers`, {
+          method: "PUT",
+          headers: await getAuthHeaders(force),
+          body: JSON.stringify(body),
         });
 
       const res = await req(false);

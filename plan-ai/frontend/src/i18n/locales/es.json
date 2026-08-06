@@ -1246,6 +1246,12 @@
       "stats": "Estadísticas Clave"
     }
   },
+  "transcripts": {
+    "speakers": {
+      "editName": "Editar nombre",
+      "updateFailed": "No se pudo guardar el nombre. Inténtalo de nuevo."
+    }
+  },
   "recordings": {
     "subtitle": "Tus grabaciones capturadas y transcripciones independientes."
   },

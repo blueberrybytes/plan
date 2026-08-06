@@ -127,6 +127,11 @@ interface UpdateStandaloneTranscriptBody {
   recordedAt?: Date | null;
 }
 
+interface UpdateSpeakerNamesBody {
+  /** Diarization label ("Speaker 0", "User 1") → corrected name. Blank name clears the identification. */
+  overrides: Record<string, string>;
+}
+
 @Route("api/transcripts")
 @Tags("Transcripts")
 export class TranscriptsController extends BaseWorkspaceController {
@@ -717,6 +722,33 @@ export class TranscriptsController extends BaseWorkspaceController {
       workspaceId,
       id,
       updateInput,
+    );
+
+    return {
+      status: 200,
+      data: this.mapTranscriptResponse(transcript),
+    };
+  }
+
+  /**
+   * Corrects AI-inferred speaker names. Body maps the stable diarization label
+   * ("Speaker 0", "User 1") to the corrected human name; blank clears it. The
+   * fix lands in metadata.speakers (what every app renders) and survives
+   * reprocessing via metadata.speakerNameOverrides.
+   */
+  @Put("{id}/speakers")
+  @Security("ClientLevel")
+  public async updateTranscriptSpeakers(
+    @Request() request: AuthenticatedRequest,
+    @Path() id: string,
+    @Body() body: UpdateSpeakerNamesBody,
+  ): Promise<ApiResponse<StandaloneTranscriptResponse>> {
+    const { workspaceId } = await this.getAuthorizedWorkspaceAccess(request);
+
+    const transcript = await transcriptCrudService.updateSpeakerNamesForWorkspace(
+      workspaceId,
+      id,
+      body.overrides ?? {},
     );
 
     return {

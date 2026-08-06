@@ -1035,6 +1035,14 @@ export default function TranscriptViewScreen() {
                       | undefined
                   )?.principalSpeaker ?? null
                 }
+                onRenameSpeaker={async (label, name) => {
+                  if (!transcript) return;
+                  const updated = await api.updateTranscriptSpeakers(
+                    transcript.id,
+                    { [label]: name },
+                  );
+                  setTranscript(updated);
+                }}
               />
             )}
             {activeTab === "metadata" && (

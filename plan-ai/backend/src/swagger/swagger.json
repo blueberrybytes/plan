@@ -2046,6 +2046,14 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"Record_string.string_": {
+				"properties": {},
+				"additionalProperties": {
+					"type": "string"
+				},
+				"type": "object",
+				"description": "Construct a type with a set of properties K of type T"
+			},
 			"PostMeetingTaskStatus": {
 				"properties": {
 					"status": {
@@ -2178,6 +2186,10 @@
 						},
 						"type": "array",
 						"description": "AI insights per speaker (name inference + summary + sentiment + speaking time)."
+					},
+					"speakerNameOverrides": {
+						"$ref": "#/components/schemas/Record_string.string_",
+						"description": "User corrections of speaker names, keyed by the stable diarization label\n(\"Speaker 0\"). Applied over `speakers[].identifiedName` on save AND\nre-applied after any reprocess so human fixes survive fresh AI passes."
 					},
 					"postMeetingTasks": {
 						"$ref": "#/components/schemas/PostMeetingTasksRecord",
@@ -2633,6 +2645,19 @@
 						"nullable": true
 					}
 				},
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UpdateSpeakerNamesBody": {
+				"properties": {
+					"overrides": {
+						"$ref": "#/components/schemas/Record_string.string_",
+						"description": "Diarization label (\"Speaker 0\", \"User 1\") → corrected name. Blank name clears the identification."
+					}
+				},
+				"required": [
+					"overrides"
+				],
 				"type": "object",
 				"additionalProperties": false
 			},
@@ -7326,7 +7351,7 @@
 	},
 	"info": {
 		"title": "backend",
-		"version": "4.2.8",
+		"version": "4.2.9",
 		"license": {
 			"name": "BUSL-1.1"
 		},
@@ -9814,6 +9839,52 @@
 						}
 					}
 				]
+			}
+		},
+		"/api/transcripts/{id}/speakers": {
+			"put": {
+				"operationId": "UpdateTranscriptSpeakers",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_StandaloneTranscriptResponse_"
+								}
+							}
+						}
+					}
+				},
+				"description": "Corrects AI-inferred speaker names. Body maps the stable diarization label\n(\"Speaker 0\", \"User 1\") to the corrected human name; blank clears it. The\nfix lands in metadata.speakers (what every app renders) and survives\nreprocessing via metadata.speakerNameOverrides.",
+				"tags": [
+					"Transcripts"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/UpdateSpeakerNamesBody"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/api/transcripts/{id}/reprocess": {

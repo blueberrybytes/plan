@@ -21,6 +21,7 @@ export type UserIntegrationSummary = components['schemas']['IntegrationSummaryRe
 export type UserResponse = components['schemas']['UserResponse'];
 export type CreateStandaloneTranscriptBody = components['schemas']['CreateStandaloneTranscriptBody'];
 export type SubscriptionStatusResponse = components['schemas']['SubscriptionStatusResponse'];
+export type UpdateSpeakerNamesBody = components['schemas']['UpdateSpeakerNamesBody'];
 
 async function handleResponseWithRetry<T>(
   res: Response,
@@ -403,6 +404,28 @@ export const createPlanAiApi = (
           method: "PUT",
           headers: await getAuthHeaders(force),
           body: JSON.stringify(payload),
+        });
+
+      const res = await req(false);
+      return handleResponseWithRetry<Transcript>(res, () => req(true));
+    },
+
+    /**
+     * Correct AI-inferred speaker names. `overrides` maps the stable diarization
+     * label ("Speaker 0", "User 1") to the corrected human name; a blank name
+     * clears the identification. Returns the updated transcript with
+     * `metadata.speakers` already patched.
+     */
+    async updateTranscriptSpeakers(
+      id: string,
+      overrides: UpdateSpeakerNamesBody["overrides"],
+    ): Promise<Transcript> {
+      const body: UpdateSpeakerNamesBody = { overrides };
+      const req = async (force: boolean) =>
+        safeFetch(`${BASE_URL}/api/transcripts/${id}/speakers`, {
+          method: "PUT",
+          headers: await getAuthHeaders(force),
+          body: JSON.stringify(body),
         });
 
       const res = await req(false);

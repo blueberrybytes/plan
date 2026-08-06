@@ -6,6 +6,7 @@ type ApiResponseStandaloneTranscriptListResponse =
   components["schemas"]["ApiResponse_StandaloneTranscriptListResponse_"];
 type ApiResponseStandaloneTranscriptResponse =
   components["schemas"]["ApiResponse_StandaloneTranscriptResponse_"];
+type UpdateSpeakerNamesBody = components["schemas"]["UpdateSpeakerNamesBody"];
 
 export const transcriptApi = createApi({
   reducerPath: "transcriptApi",
@@ -58,6 +59,20 @@ export const transcriptApi = createApi({
         { type: "Transcript", id: transcriptId },
       ],
     }),
+    // Corrects AI-inferred speaker names. Maps the stable diarization label
+    // ("Speaker 0") to the corrected human name; blank clears it. Invalidates
+    // the detail tag so open views refetch the patched metadata.speakers.
+    updateTranscriptSpeakers: builder.mutation<
+      ApiResponseStandaloneTranscriptResponse,
+      { id: string; overrides: UpdateSpeakerNamesBody["overrides"] }
+    >({
+      query: ({ id, overrides }) => ({
+        url: `/api/transcripts/${id}/speakers`,
+        method: "PUT",
+        body: { overrides } satisfies UpdateSpeakerNamesBody,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: "Transcript", id }],
+    }),
     reprocessTranscript: builder.mutation<ApiResponseStandaloneTranscriptResponse, string>({
       query: (id: string) => ({
         url: `/api/transcripts/${id}/reprocess`,
@@ -74,6 +89,7 @@ export const {
   useListGlobalTranscriptsQuery,
   useGetTranscriptQuery,
   useDeleteTranscriptMutation,
+  useUpdateTranscriptSpeakersMutation,
   useRetryPostMeetingTaskMutation,
   useReprocessTranscriptMutation,
 } = transcriptApi;

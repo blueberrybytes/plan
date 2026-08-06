@@ -47,6 +47,7 @@ const BrandThemes: React.FC = () => {
       await downloadThemeTemplateDocx({
         name: tmpl.name,
         primaryColor: tmpl.primaryColor,
+        secondaryColor: tmpl.secondaryColor,
         textColor: tmpl.textColor,
         headingFont: tmpl.headingFont,
         bodyFont: tmpl.bodyFont,
@@ -160,7 +161,9 @@ const BrandThemes: React.FC = () => {
                         )}
                       </Box>
                       <Box>
-                        <Tooltip title={t("slides.themes.downloadDocx", "Download as Word template")}>
+                        <Tooltip
+                          title={t("slides.themes.downloadDocx", "Download as Word template")}
+                        >
                           <span>
                             <IconButton
                               onClick={() => handleDownloadTemplate(tmpl)}

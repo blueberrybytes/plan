@@ -15,6 +15,7 @@ import { aiUsageService } from "./aiUsageService";
 import { getPersonaInstructions } from "./personaService";
 import { mcpClientService } from "./mcpClientService";
 import { MERMAID_SYNTAX_RULES } from "../prompts/mermaidRules";
+import type { TranscriptMetadata } from "./transcriptMetadataTypes";
 
 export interface CreateDocInput {
   title: string;
@@ -154,10 +155,42 @@ export class DocGenerationService {
     if (input.transcriptIds && input.transcriptIds.length > 0) {
       const transcripts = await prisma.transcript.findMany({
         where: { id: { in: input.transcriptIds }, workspaceId },
-        select: { title: true, transcript: true, summary: true },
+        select: {
+          title: true,
+          transcript: true,
+          summary: true,
+          recordedAt: true,
+          durationSeconds: true,
+          metadata: true,
+        },
       });
       for (const t of transcripts) {
         const parts = [`## Transcript: ${t.title ?? "Untitled"}`];
+
+        // KNOWN meeting facts. Without these the model invents an agenda-style
+        // template with "[Insert Date of Meeting]" placeholders — it was never
+        // told the date even though the transcript row has it (reported bug).
+        const facts: string[] = [];
+        if (t.recordedAt) {
+          facts.push(
+            `Date: ${t.recordedAt.toISOString().slice(0, 10)} (${t.recordedAt.toUTCString().slice(0, 22)} UTC)`,
+          );
+        }
+        if (t.durationSeconds && t.durationSeconds > 0) {
+          facts.push(`Duration: ${Math.round(t.durationSeconds / 60)} minutes`);
+        }
+        const insights = (t.metadata as TranscriptMetadata | null)?.speakers;
+        if (insights && insights.length > 0) {
+          const attendees = insights
+            .map((s) => {
+              const name = s.identifiedName?.trim() || s.label;
+              return s.role ? `${name} (${s.role})` : name;
+            })
+            .join(", ");
+          facts.push(`Attendees: ${attendees}`);
+        }
+        if (facts.length > 0) parts.push(`**Known meeting facts:**\n${facts.join("\n")}`);
+
         if (t.summary) parts.push(`**Summary:** ${t.summary}`);
         if (t.transcript) parts.push(t.transcript);
         transcriptTexts.push(parts.join("\n"));
@@ -359,6 +392,7 @@ ${MERMAID_SYNTAX_RULES}
 If the user's prompt implies generating tasks, action items, or a checklist, you MUST format each task with a Markdown checkbox (e.g., \`- [ ] Task description\`).
 Make the document comprehensive, well-organized, and ready to share.
 Do NOT include any preamble like "Here is your document" — start directly with the H1 title.
+NEVER emit fill-in placeholders like "[Insert Date of Meeting]", "[Attendees TBD]" or "[Insert X]". Use the facts provided (e.g. "Known meeting facts"); if a fact is not provided, OMIT that line entirely rather than inventing a placeholder for it.
 
 ${contextSection}
 ${transcriptSection}

@@ -69,6 +69,12 @@ export interface TranscriptMetadata {
   principalSpeaker?: string;
   /** AI insights per speaker (name inference + summary + sentiment + speaking time). */
   speakers?: SpeakerInsight[];
+  /**
+   * User corrections of speaker names, keyed by the stable diarization label
+   * ("Speaker 0"). Applied over `speakers[].identifiedName` on save AND
+   * re-applied after any reprocess so human fixes survive fresh AI passes.
+   */
+  speakerNameOverrides?: Record<string, string>;
   /** Per-step status of fire-and-forget effects kicked off after a transcript is processed */
   postMeetingTasks?: PostMeetingTasksRecord;
 }

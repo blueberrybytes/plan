@@ -590,6 +590,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/transcripts/{id}/speakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description Corrects AI-inferred speaker names. Body maps the stable diarization label
+         *     ("Speaker 0", "User 1") to the corrected human name; blank clears it. The
+         *     fix lands in metadata.speakers (what every app renders) and survives
+         *     reprocessing via metadata.speakerNameOverrides.
+         */
+        put: operations["UpdateTranscriptSpeakers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/transcripts/{id}/reprocess": {
         parameters: {
             query?: never;
@@ -3147,6 +3169,10 @@ export interface components {
              */
             utteranceCount: number;
         };
+        /** @description Construct a type with a set of properties K of type T */
+        "Record_string.string_": {
+            [key: string]: string;
+        };
         PostMeetingTaskStatus: {
             /** @enum {string} */
             status: "PENDING" | "OK" | "FAILED" | "SKIPPED";
@@ -3193,6 +3219,12 @@ export interface components {
             principalSpeaker?: string;
             /** @description AI insights per speaker (name inference + summary + sentiment + speaking time). */
             speakers?: components["schemas"]["SpeakerInsight"][];
+            /**
+             * @description User corrections of speaker names, keyed by the stable diarization label
+             *     ("Speaker 0"). Applied over `speakers[].identifiedName` on save AND
+             *     re-applied after any reprocess so human fixes survive fresh AI passes.
+             */
+            speakerNameOverrides?: components["schemas"]["Record_string.string_"];
             /** @description Per-step status of fire-and-forget effects kicked off after a transcript is processed */
             postMeetingTasks?: components["schemas"]["PostMeetingTasksRecord"];
         };
@@ -3310,6 +3342,10 @@ export interface components {
             metadata?: components["schemas"]["TsoaJsonObject"] | null;
             /** Format: date-time */
             recordedAt?: string | null;
+        };
+        UpdateSpeakerNamesBody: {
+            /** @description Diarization label ("Speaker 0", "User 1") → corrected name. Blank name clears the identification. */
+            overrides: components["schemas"]["Record_string.string_"];
         };
         "ApiResponse__success-boolean__": {
             message?: string;
@@ -6059,6 +6095,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse__success-boolean__"];
+                };
+            };
+        };
+    };
+    UpdateTranscriptSpeakers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSpeakerNamesBody"];
+            };
+        };
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_StandaloneTranscriptResponse_"];
                 };
             };
         };

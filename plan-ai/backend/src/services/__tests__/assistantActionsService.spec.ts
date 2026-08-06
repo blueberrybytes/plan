@@ -175,7 +175,9 @@ describe("provider registry — a second provider (Jira) flows through the same 
     expect(db.task.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          metadata: expect.objectContaining({ jira: expect.objectContaining({ issueKey: "BK-1" }) }),
+          metadata: expect.objectContaining({
+            jira: expect.objectContaining({ issueKey: "BK-1" }),
+          }),
         }),
       }),
     );

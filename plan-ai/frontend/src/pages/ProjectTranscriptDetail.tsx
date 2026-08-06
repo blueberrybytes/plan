@@ -645,6 +645,12 @@ const ProjectTranscriptDetail: React.FC = () => {
                       {tabValue === "speakers" && (
                         <Box sx={{ mt: 2 }}>
                           <SpeakerInsightsTab
+                            transcriptId={transcriptId}
+                            onSpeakersUpdated={() => {
+                              // Project transcripts are cached by projectApi, out of
+                              // reach of transcriptApi's tag invalidation — refetch.
+                              void refetchTranscript();
+                            }}
                             speakers={
                               (transcript.metadata as { speakers?: SpeakerInsight[] } | null)
                                 ?.speakers ?? []

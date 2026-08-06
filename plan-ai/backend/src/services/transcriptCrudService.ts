@@ -210,6 +210,49 @@ export class TranscriptCrudService {
     });
   }
 
+  /**
+   * Corrects the AI-inferred speaker names of a transcript. `overrides` maps the
+   * stable diarization label ("Speaker 0", "User 1") to the human-corrected
+   * name; an empty/blank name clears the identification back to null.
+   *
+   * The correction is applied directly to `metadata.speakers[].identifiedName`
+   * (the single source every UI and the doc-generation prompt read), and the raw
+   * map is kept in `metadata.speakerNameOverrides` so reprocessing can re-apply
+   * user corrections over a fresh AI pass.
+   */
+  public async updateSpeakerNamesForWorkspace(
+    workspaceId: string,
+    transcriptId: string,
+    overrides: Record<string, string>,
+  ): Promise<Transcript> {
+    const transcript = await this.getTranscriptForWorkspace(workspaceId, transcriptId);
+
+    const metadata = ((transcript.metadata as Record<string, unknown>) ?? {}) as {
+      speakers?: { label: string; identifiedName: string | null }[];
+      speakerNameOverrides?: Record<string, string>;
+    } & Record<string, unknown>;
+
+    const insights = metadata.speakers ?? [];
+    const cleaned: Record<string, string> = { ...(metadata.speakerNameOverrides ?? {}) };
+
+    for (const [label, rawName] of Object.entries(overrides)) {
+      const name = (rawName ?? "").trim().slice(0, 80);
+      const insight = insights.find((s) => s.label === label);
+      if (!insight) continue; // unknown label — ignore rather than corrupt
+      insight.identifiedName = name || null;
+      if (name) cleaned[label] = name;
+      else delete cleaned[label];
+    }
+
+    metadata.speakers = insights;
+    metadata.speakerNameOverrides = cleaned;
+
+    return prisma.transcript.update({
+      where: { id: transcriptId },
+      data: { metadata: metadata as Prisma.InputJsonObject },
+    });
+  }
+
   public async deleteTranscriptForWorkspace(
     workspaceId: string,
     transcriptId: string,

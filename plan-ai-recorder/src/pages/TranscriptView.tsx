@@ -1261,6 +1261,18 @@ const TranscriptView: React.FC = () => {
                           | undefined
                         )?.principalSpeaker ?? null
                       }
+                      onRenameSpeaker={async (label, name) => {
+                        const updated = await api.updateTranscriptSpeakers(
+                          transcript.id,
+                          { [label]: name },
+                        );
+                        // Patch only metadata: it carries the corrected
+                        // speakers array (and overrides), while keeping the
+                        // already-loaded tasks/utterances/chatThread intact.
+                        setTranscript((prev) =>
+                          prev ? { ...prev, metadata: updated.metadata } : updated,
+                        );
+                      }}
                     />
                   </Box>
                 )}
