@@ -249,7 +249,11 @@ const DocView: React.FC = () => {
   const handleExportDocx = async () => {
     setExportAnchor(null);
     if (!doc) return;
-    await exportMarkdownToDocx(title, content);
+    // Pass the doc's brand theme so the .docx opens on-brand in Google Docs.
+    const brandTheme = (
+      doc as DocDocumentResponse & { theme?: Record<string, string> | null }
+    ).theme;
+    await exportMarkdownToDocx(title, content, brandTheme);
   };
 
   const theme = (

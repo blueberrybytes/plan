@@ -1122,6 +1122,8 @@
       "empty": "Aún no hay temas. Crea uno para empezar.",
       "loading": "Cargando temas...",
       "deleteConfirm": "¿Estás seguro de que deseas eliminar este tema?",
+      "downloadDocx": "Descargar como plantilla Word",
+      "editTooltip": "Editar tema",
       "form": {
         "name": "Nombre del Tema",
         "colors": "Colores",
@@ -1133,7 +1135,19 @@
         "bodyFont": "Fuente de Cuerpo",
         "presets": "Preajustes",
         "save": "Guardar Tema",
-        "saving": "Guardando..."
+        "saving": "Guardando...",
+        "pageTitle": "Temas de marca",
+        "logo": "Logo (opcional)",
+        "uploadLogo": "Subir logo",
+        "uploading": "Subiendo...",
+        "styles": "Estilos",
+        "backgroundStyle": "Estilo de fondo",
+        "cardStyle": "Estilo de tarjeta"
+      },
+      "import": {
+        "title": "Importar desde una web",
+        "subtitle": "Deja que la IA extraiga tus colores, tipografías y logo de cualquier URL.",
+        "cta": "Importar desde la web"
       }
     },
     "create": {

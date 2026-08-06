@@ -1128,6 +1128,8 @@
       "empty": "No themes yet. Create one to get started.",
       "loading": "Loading themes...",
       "deleteConfirm": "Are you sure you want to delete this theme?",
+      "downloadDocx": "Download as Word template",
+      "editTooltip": "Edit theme",
       "form": {
         "name": "Theme Name",
         "colors": "Colors",
@@ -1139,7 +1141,19 @@
         "bodyFont": "Body Font",
         "presets": "Presets",
         "save": "Save Theme",
-        "saving": "Saving..."
+        "saving": "Saving...",
+        "pageTitle": "Brand Themes",
+        "logo": "Logo (optional)",
+        "uploadLogo": "Upload Logo",
+        "uploading": "Uploading...",
+        "styles": "Styles",
+        "backgroundStyle": "Background Style",
+        "cardStyle": "Card Style"
+      },
+      "import": {
+        "title": "Import from a website",
+        "subtitle": "Let AI extract your colors, fonts, and logo from any URL.",
+        "cta": "Import from website"
       }
     },
     "create": {

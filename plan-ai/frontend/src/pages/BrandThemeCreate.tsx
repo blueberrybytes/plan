@@ -13,13 +13,15 @@ import {
   IconButton,
   useTheme,
 } from "@mui/material";
-import { getContrastRatio } from "@mui/material/styles";
+import type { SxProps, Theme } from "@mui/material";
+import { getContrastRatio, alpha } from "@mui/material/styles";
 import {
   ArrowBack as ArrowBackIcon,
   Save as SaveIcon,
   CloudUpload as CloudUploadIcon,
   Delete as DeleteIcon,
   Language as LanguageIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from "@mui/icons-material";
 import { storage, auth } from "../firebase/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -67,6 +69,124 @@ Here is some \`inline code\` and a table:
 | Slides | Active |
 
 `;
+
+const SectionHeading: React.FC<{ children: React.ReactNode; sx?: SxProps<Theme> }> = ({
+  children,
+  sx,
+}) => (
+  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, ...sx }}>
+    {children}
+  </Typography>
+);
+
+interface ColorFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  fullWidth?: boolean;
+}
+
+const ColorField: React.FC<ColorFieldProps> = ({ label, value, onChange, fullWidth }) => (
+  <Box sx={{ flex: fullWidth ? undefined : 1, width: fullWidth ? "100%" : undefined }}>
+    <Typography variant="caption" color="text.secondary">
+      {label}
+    </Typography>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: 40, height: 40, border: "none", cursor: "pointer", borderRadius: 4 }}
+      />
+      <TextField
+        size="small"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        sx={{ flex: 1 }}
+      />
+    </Box>
+  </Box>
+);
+
+const ImportWebsiteCard: React.FC<{ onImport: () => void }> = ({ onImport }) => {
+  const { t } = useTranslation();
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        mb: 3,
+        p: 2,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: "primary.main",
+        bgcolor: (theme) =>
+          alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.06),
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, mb: 1.5 }}>
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            flexShrink: 0,
+            borderRadius: "50%",
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <LanguageIcon />
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="subtitle2" fontWeight={700} lineHeight={1.3}>
+            {t("slides.themes.import.title")}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            {t("slides.themes.import.subtitle")}
+          </Typography>
+        </Box>
+      </Box>
+      <Button variant="contained" fullWidth startIcon={<AutoAwesomeIcon />} onClick={onImport}>
+        {t("slides.themes.import.cta")}
+      </Button>
+    </Card>
+  );
+};
+
+interface SaveThemeBarProps {
+  onSave: () => void;
+  saving: boolean;
+  disabled: boolean;
+}
+
+const SaveThemeBar: React.FC<SaveThemeBarProps> = ({ onSave, saving, disabled }) => {
+  const { t } = useTranslation();
+  return (
+    <Box
+      sx={{
+        flexShrink: 0,
+        px: 3,
+        py: 2,
+        borderTop: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+      }}
+    >
+      <Button
+        variant="contained"
+        fullWidth
+        size="large"
+        startIcon={<SaveIcon />}
+        onClick={onSave}
+        disabled={disabled}
+      >
+        {saving ? t("slides.themes.form.saving") : t("slides.themes.form.save")}
+      </Button>
+    </Box>
+  );
+};
 
 const BrandThemeCreate: React.FC = () => {
   const { t } = useTranslation();
@@ -269,49 +389,286 @@ const BrandThemeCreate: React.FC = () => {
   return (
     <SidebarLayout>
       <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-        {/* Left: Controls */}
+        {/* Left: Controls — fixed header / scrollable form / pinned Save footer */}
         <Box
           sx={{
             width: 380,
             flexShrink: 0,
+            height: "100%",
             borderRight: 1,
             borderColor: "divider",
-            overflowY: "auto",
             bgcolor: "background.paper",
-            p: 3,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
           }}
         >
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 2 }}>
-            {t("slides.actions.back")}
-          </Button>
-
+          {/* 1 — FIXED HEADER */}
           <Box
-            sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}
+            sx={{
+              flexShrink: 0,
+              px: 3,
+              pt: 2,
+              pb: 1.5,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
           >
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate(-1)}
+              size="small"
+              sx={{ ml: -1, mb: 0.5 }}
+            >
+              {t("slides.actions.back")}
+            </Button>
             <Typography variant="h5" fontWeight={700}>
-              Brand Themes
+              {t("slides.themes.form.pageTitle")}
             </Typography>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<LanguageIcon />}
-                onClick={() => setAnalyzeDialogOpen(true)}
-              >
-                Import
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handleSave}
-                disabled={!themeName.trim() || isCreating || isUpdating}
-              >
-                {isCreating || isUpdating
-                  ? t("slides.themes.form.saving")
-                  : t("slides.themes.form.save")}
-              </Button>
-            </Box>
           </Box>
 
+          {/* 2 — SCROLLABLE FORM (the ONLY scroller; minHeight:0 is what pins the footer) */}
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 3, py: 2.5 }}>
+            {/* Hero: website import */}
+            <ImportWebsiteCard onImport={() => setAnalyzeDialogOpen(true)} />
+
+            {/* Theme Name */}
+            <TextField
+              label={t("slides.themes.form.name")}
+              fullWidth
+              value={themeName}
+              onChange={(e) => setThemeName(e.target.value)}
+              sx={{ mb: 3 }}
+            />
+
+            {/* Logo */}
+            <SectionHeading>{t("slides.themes.form.logo")}</SectionHeading>
+            <Box sx={{ mb: 3 }}>
+              {logoUrl ? (
+                <Box
+                  sx={{
+                    position: "relative",
+                    width: "100%",
+                    height: 100,
+                    bgcolor: "background.default",
+                    borderRadius: 1,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    mb: 1,
+                    overflow: "hidden",
+                  }}
+                >
+                  <img
+                    src={logoUrl}
+                    alt="Logo"
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                  />
+                  <IconButton
+                    size="small"
+                    color="error"
+                    sx={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      bgcolor: "rgba(0,0,0,0.5)",
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                    }}
+                    onClick={() => setLogoUrl(null)}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              ) : (
+                <Button
+                  variant="outlined"
+                  component="label"
+                  fullWidth
+                  disabled={isUploadingLogo}
+                  startIcon={<CloudUploadIcon />}
+                  size="large"
+                  sx={{ borderStyle: "dashed" }}
+                >
+                  {isUploadingLogo
+                    ? t("slides.themes.form.uploading")
+                    : t("slides.themes.form.uploadLogo")}
+                  <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+                </Button>
+              )}
+            </Box>
+
+            {/* Colors */}
+            <SectionHeading>{t("slides.themes.form.colors")}</SectionHeading>
+            <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+              <ColorField
+                label={t("slides.themes.form.primaryColor")}
+                value={primaryColor}
+                onChange={setPrimaryColor}
+              />
+              <ColorField
+                label={t("slides.themes.form.secondaryColor")}
+                value={secondaryColor}
+                onChange={setSecondaryColor}
+              />
+            </Box>
+            <Box sx={{ mb: 3 }}>
+              <ColorField
+                label={t("slides.themes.form.backgroundColor")}
+                value={backgroundColor}
+                onChange={setBackgroundColor}
+                fullWidth
+              />
+            </Box>
+
+            {/* Styles */}
+            <SectionHeading>{t("slides.themes.form.styles")}</SectionHeading>
+            <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+              <TextField
+                select
+                label={t("slides.themes.form.backgroundStyle")}
+                fullWidth
+                value={backgroundStyle}
+                SelectProps={{
+                  MenuProps: {
+                    sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
+                  },
+                }}
+                onChange={(e) =>
+                  setBackgroundStyle(e.target.value as "solid" | "gradient" | "mesh" | "minimal")
+                }
+              >
+                <MenuItem value="solid">Solid</MenuItem>
+                <MenuItem value="gradient">Gradient</MenuItem>
+                <MenuItem value="mesh">Mesh Texture</MenuItem>
+                <MenuItem value="minimal">Minimal Grid</MenuItem>
+              </TextField>
+              <TextField
+                select
+                label={t("slides.themes.form.cardStyle")}
+                fullWidth
+                value={cardStyle}
+                SelectProps={{
+                  MenuProps: {
+                    sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
+                  },
+                }}
+                onChange={(e) => {
+                  setCardStyle(e.target.value as "flat" | "glass" | "outline");
+                  if (previewSlide === 0) {
+                    setPreviewSlide(7); // Switch to Stats slide to show the card effect
+                  }
+                }}
+              >
+                <MenuItem value="flat">Flat</MenuItem>
+                <MenuItem value="glass">Glassmorphism</MenuItem>
+                <MenuItem value="outline">Outline</MenuItem>
+              </TextField>
+            </Box>
+
+            {/* Typography */}
+            <SectionHeading>{t("slides.themes.form.typography")}</SectionHeading>
+            <TextField
+              select
+              label={t("slides.themes.form.headingFont")}
+              fullWidth
+              value={headingFont}
+              SelectProps={{
+                MenuProps: {
+                  sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
+                },
+              }}
+              onChange={(e) => setHeadingFont(e.target.value)}
+              sx={{ mb: 2 }}
+            >
+              {FONT_OPTIONS.map((font) => (
+                <MenuItem key={font} value={font} sx={{ fontFamily: font }}>
+                  {font}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label={t("slides.themes.form.bodyFont")}
+              fullWidth
+              value={bodyFont}
+              SelectProps={{
+                MenuProps: {
+                  sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
+                },
+              }}
+              onChange={(e) => setBodyFont(e.target.value)}
+              sx={{ mb: 3 }}
+            >
+              {FONT_OPTIONS.map((font) => (
+                <MenuItem key={font} value={font} sx={{ fontFamily: font }}>
+                  {font}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <Divider sx={{ mb: 3 }} />
+
+            {/* Presets */}
+            <SectionHeading sx={{ mb: 1.5 }}>{t("slides.themes.form.presets")}</SectionHeading>
+            <Grid container spacing={1}>
+              {THEME_PRESETS.map((preset) => (
+                <Grid item xs={6} key={preset.name}>
+                  <Card variant="outlined" sx={{ cursor: "pointer" }}>
+                    <CardActionArea onClick={() => applyPreset(preset)}>
+                      <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                        <Box sx={{ display: "flex", gap: 0.5, mb: 0.5 }}>
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              bgcolor: preset.primaryColor,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          />
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              bgcolor: preset.secondaryColor,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          />
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              bgcolor: preset.backgroundColor,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          />
+                        </Box>
+                        <Typography variant="caption" fontWeight={600} noWrap>
+                          {preset.name}
+                        </Typography>
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+
+          {/* 3 — PINNED SAVE FOOTER (flex sibling outside the scroll region) */}
+          <SaveThemeBar
+            onSave={handleSave}
+            saving={isCreating || isUpdating}
+            disabled={!themeName.trim() || isCreating || isUpdating}
+          />
+
+          {/* Website-import dialog — moved here verbatim, portaled so position is cosmetic */}
           <AnalyzeWebsiteDialog
             open={analyzeDialogOpen}
             onClose={() => setAnalyzeDialogOpen(false)}
@@ -329,300 +686,6 @@ const BrandThemeCreate: React.FC = () => {
               }
             }}
           />
-
-          {/* Theme Name */}
-          <TextField
-            label={t("slides.themes.form.name")}
-            fullWidth
-            value={themeName}
-            onChange={(e) => setThemeName(e.target.value)}
-            sx={{ mb: 3 }}
-          />
-
-          {/* Logo */}
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-            Logo (Optional)
-          </Typography>
-          <Box sx={{ mb: 3 }}>
-            {logoUrl ? (
-              <Box
-                sx={{
-                  position: "relative",
-                  width: "100%",
-                  height: 100,
-                  bgcolor: "background.default",
-                  borderRadius: 1,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  mb: 1,
-                  overflow: "hidden",
-                }}
-              >
-                <img
-                  src={logoUrl}
-                  alt="Logo"
-                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                />
-                <IconButton
-                  size="small"
-                  color="error"
-                  sx={{
-                    position: "absolute",
-                    top: 4,
-                    right: 4,
-                    bgcolor: "rgba(0,0,0,0.5)",
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
-                  }}
-                  onClick={() => setLogoUrl(null)}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            ) : (
-              <Button
-                variant="outlined"
-                component="label"
-                fullWidth
-                disabled={isUploadingLogo}
-                startIcon={<CloudUploadIcon />}
-                size="large"
-                sx={{ borderStyle: "dashed" }}
-              >
-                {isUploadingLogo ? "Uploading..." : "Upload Logo"}
-                <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
-              </Button>
-            )}
-          </Box>
-
-          {/* Colors */}
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-            {t("slides.themes.form.colors")}
-          </Typography>
-          <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                {t("slides.themes.form.primaryColor")}
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-                <input
-                  type="color"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    border: "none",
-                    cursor: "pointer",
-                    borderRadius: 4,
-                  }}
-                />
-                <TextField
-                  size="small"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                {t("slides.themes.form.secondaryColor")}
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-                <input
-                  type="color"
-                  value={secondaryColor}
-                  onChange={(e) => setSecondaryColor(e.target.value)}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    border: "none",
-                    cursor: "pointer",
-                    borderRadius: 4,
-                  }}
-                />
-                <TextField
-                  size="small"
-                  value={secondaryColor}
-                  onChange={(e) => setSecondaryColor(e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-              </Box>
-            </Box>
-          </Box>
-
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              {t("slides.themes.form.backgroundColor")}
-            </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-              <input
-                type="color"
-                value={backgroundColor}
-                onChange={(e) => setBackgroundColor(e.target.value)}
-                style={{
-                  width: 40,
-                  height: 40,
-                  border: "none",
-                  cursor: "pointer",
-                  borderRadius: 4,
-                }}
-              />
-              <TextField
-                size="small"
-                value={backgroundColor}
-                onChange={(e) => setBackgroundColor(e.target.value)}
-                fullWidth
-              />
-            </Box>
-          </Box>
-
-          {/* Styles */}
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-            Styles
-          </Typography>
-          <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-            <TextField
-              select
-              label="Background Style"
-              fullWidth
-              value={backgroundStyle}
-              SelectProps={{
-                MenuProps: {
-                  sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
-                },
-              }}
-              onChange={(e) =>
-                setBackgroundStyle(e.target.value as "solid" | "gradient" | "mesh" | "minimal")
-              }
-            >
-              <MenuItem value="solid">Solid</MenuItem>
-              <MenuItem value="gradient">Gradient</MenuItem>
-              <MenuItem value="mesh">Mesh Texture</MenuItem>
-              <MenuItem value="minimal">Minimal Grid</MenuItem>
-            </TextField>
-            <TextField
-              select
-              label="Card Style"
-              fullWidth
-              value={cardStyle}
-              SelectProps={{
-                MenuProps: {
-                  sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
-                },
-              }}
-              onChange={(e) => {
-                setCardStyle(e.target.value as "flat" | "glass" | "outline");
-                if (previewSlide === 0) {
-                  setPreviewSlide(7); // Switch to Stats slide to show the card effect
-                }
-              }}
-            >
-              <MenuItem value="flat">Flat</MenuItem>
-              <MenuItem value="glass">Glassmorphism</MenuItem>
-              <MenuItem value="outline">Outline</MenuItem>
-            </TextField>
-          </Box>
-
-          {/* Typography */}
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-            {t("slides.themes.form.typography")}
-          </Typography>
-          <TextField
-            select
-            label={t("slides.themes.form.headingFont")}
-            fullWidth
-            value={headingFont}
-            SelectProps={{
-              MenuProps: {
-                sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
-              },
-            }}
-            onChange={(e) => setHeadingFont(e.target.value)}
-            sx={{ mb: 2 }}
-          >
-            {FONT_OPTIONS.map((font) => (
-              <MenuItem key={font} value={font} sx={{ fontFamily: font }}>
-                {font}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label={t("slides.themes.form.bodyFont")}
-            fullWidth
-            value={bodyFont}
-            SelectProps={{
-              MenuProps: {
-                sx: { "& .MuiMenuItem-root": { color: "text.primary" } },
-              },
-            }}
-            onChange={(e) => setBodyFont(e.target.value)}
-            sx={{ mb: 3 }}
-          >
-            {FONT_OPTIONS.map((font) => (
-              <MenuItem key={font} value={font} sx={{ fontFamily: font }}>
-                {font}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <Divider sx={{ mb: 3 }} />
-
-          {/* Presets */}
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-            {t("slides.themes.form.presets")}
-          </Typography>
-          <Grid container spacing={1} sx={{ mb: 3 }}>
-            {THEME_PRESETS.map((preset) => (
-              <Grid item xs={6} key={preset.name}>
-                <Card variant="outlined" sx={{ cursor: "pointer" }}>
-                  <CardActionArea onClick={() => applyPreset(preset)}>
-                    <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                      <Box sx={{ display: "flex", gap: 0.5, mb: 0.5 }}>
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            bgcolor: preset.primaryColor,
-                            border: "1px solid",
-                            borderColor: "divider",
-                          }}
-                        />
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            bgcolor: preset.secondaryColor,
-                            border: "1px solid",
-                            borderColor: "divider",
-                          }}
-                        />
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            bgcolor: preset.backgroundColor,
-                            border: "1px solid",
-                            borderColor: "divider",
-                          }}
-                        />
-                      </Box>
-                      <Typography variant="caption" fontWeight={600} noWrap>
-                        {preset.name}
-                      </Typography>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
         </Box>
 
         {/* Right: Live Preview */}

@@ -62,7 +62,8 @@ const PublicDocView: React.FC = () => {
   const handleExportDocx = async () => {
     setExportAnchor(null);
     if (!doc) return;
-    await exportMarkdownToDocx(doc.title, doc.content || "");
+    // Pass the doc's brand theme so the .docx opens on-brand in Google Docs.
+    await exportMarkdownToDocx(doc.title, doc.content || "", doc.theme);
   };
 
   if (isLoading)
