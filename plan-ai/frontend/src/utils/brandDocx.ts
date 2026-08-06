@@ -286,29 +286,33 @@ const buildHeader = (theme: BrandDocxTheme, s: ResolvedStyle, logo: LogoData | n
   // — inconsistent. A plain RIGHT-aligned paragraph with name + logo side by
   // side renders identically everywhere, and matches the classic brand-template
   // look (name and logo together at the top right).
+  // Aspect-correct logo box: a wide wordmark logo forced into 40×40 rendered
+  // visibly squashed (reported distortion). Fit within 150×40 preserving ratio.
+  const logoBox = logo ? fitLogo(logo.width, logo.height) : null;
+
   const children: (TextRun | ImageRun)[] = [];
   if (name) {
+    // Raise the name so it centres against the logo's actual height (inline
+    // images sit ON the baseline; text otherwise renders visibly lower).
+    const raisePt = logoBox ? Math.max(0, Math.round((logoBox.height - 11) / 2)) : 0;
     children.push(
       new TextRun({
         text: name,
         bold: true,
         font: s.headingFont,
         size: hp(11),
-        color: s.primary,
-        // Inline images sit ON the baseline, so plain text renders visibly lower
-        // than the 40px logo beside it. Raising the name ~9pt centres it against
-        // the logo's height. No logo → no raise.
-        position: logo ? "9pt" : undefined,
+        color: s.accent,
+        position: raisePt > 0 ? (`${raisePt}pt` as const) : undefined,
       }),
     );
   }
-  if (logo) {
+  if (logo && logoBox) {
     if (name) children.push(new TextRun({ text: "  ", font: s.bodyFont }));
     children.push(
       new ImageRun({
         type: logo.type,
         data: logo.data,
-        transformation: { width: 40, height: 40 },
+        transformation: logoBox,
       }),
     );
   }
