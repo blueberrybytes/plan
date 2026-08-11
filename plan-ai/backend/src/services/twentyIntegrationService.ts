@@ -29,6 +29,35 @@ const REQUEST_TIMEOUT_MS = 15_000;
 /** Never ship a wall of raw transcript into someone's CRM. */
 const MAX_NOTE_MARKDOWN_CHARS = 20_000;
 
+// ── transcript attachment ──────────────────────────────────────────────────
+//
+// The note stays a readable summary; the full transcript rides along as a file
+// on the company record, so account managers can dig into the actual words
+// without the CRM timeline turning into a wall of text.
+//
+// Contract verified against a live Twenty instance (2026-08). Uploads are
+// presigned, NOT GraphQL multipart:
+//   1. createFileUpload(filename, size, fileFolder, fieldMetadataId) on
+//      /metadata → { fileId, uploadUrl, contentType }
+//   2. PUT the bytes to uploadUrl (the signature is the auth — no Bearer)
+//   3. completeFileUpload(fileId) → { path, url }
+//   4. POST /rest/attachments with file:[{fileId,label}] + targetCompanyId
+//      (`companyId` is rejected, same as noteTarget).
+
+/** Uploads for a FILES-typed field land here; there is no "Attachment" folder. */
+const TWENTY_FILE_FOLDER = "FilesField";
+
+/** Twenty caps `fileCategory` to this enum, UPPER_SNAKE — "TextDocument" 400s. */
+const TWENTY_TEXT_DOCUMENT_CATEGORY = "TEXT_DOCUMENT";
+
+/**
+ * `attachment.file` field id, per Twenty host.
+ *
+ * Workspace-scoped metadata that costs two queries to resolve and never changes
+ * while the process runs, so it's looked up once per host rather than per push.
+ */
+const attachmentFileFieldIds = new Map<string, string>();
+
 // ── meeting identity tuning ────────────────────────────────────────────────
 /** Client clocks drift; widen both intervals before comparing. */
 const CLOCK_SKEW_MS = 10 * 60 * 1000;
@@ -154,6 +183,43 @@ class TwentyIntegrationService {
       );
     }
     return (await response.json()) as T;
+  }
+
+  /**
+   * Twenty's metadata GraphQL endpoint — a different surface from `/rest`, and
+   * the only place file uploads live.
+   */
+  private async metadataGraphql<T>(
+    baseUrl: string,
+    apiKey: string,
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
+    const response = await fetch(`${baseUrl}/metadata`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Twenty metadata API ${response.status} ${response.statusText}: ${body.slice(0, 300)}`,
+      );
+    }
+
+    const payload = (await response.json()) as { data?: T; errors?: { message: string }[] };
+    // GraphQL answers 200 with an `errors` array, so a status check isn't enough.
+    if (payload.errors?.length) {
+      throw new Error(`Twenty metadata API: ${payload.errors.map((e) => e.message).join("; ")}`);
+    }
+    if (!payload.data) throw new Error("Twenty metadata API returned no data");
+    return payload.data;
   }
 
   /**
@@ -322,6 +388,177 @@ class TwentyIntegrationService {
     return parts.join("\n").slice(0, MAX_NOTE_MARKDOWN_CHARS);
   }
 
+  /**
+   * The full transcript, as a file. Unlike the note body this deliberately
+   * carries the raw words — that's the point of shipping it as an attachment
+   * instead of pasting it into the timeline.
+   */
+  public buildTranscriptFileMarkdown(transcript: Transcript): string {
+    const metadata = (transcript.metadata ?? null) as TranscriptMetadata | null;
+    const when = transcript.recordedAt ?? transcript.createdAt;
+    const parts: string[] = [`# ${transcript.title?.trim() || "Reunión"}`, ""];
+
+    parts.push(`**Fecha:** ${when.toISOString().slice(0, 10)}`);
+    if (transcript.durationSeconds) {
+      parts.push(`**Duración:** ${Math.round(transcript.durationSeconds / 60)} min`);
+    }
+
+    const speakers: SpeakerInsight[] = metadata?.speakers ?? [];
+    if (speakers.length > 0) {
+      const attendees = speakers
+        .map((s) => {
+          const name = s.identifiedName?.trim() || s.label;
+          return s.role ? `${name} (${s.role})` : name;
+        })
+        .join(", ");
+      parts.push(`**Asistentes:** ${attendees}`);
+    }
+
+    if (transcript.summary) parts.push("", "## Resumen", transcript.summary);
+
+    parts.push("", "## Transcripción", "");
+
+    // Prefer diarized turns — "who said what" is most of the value of having
+    // the raw transcript at all. Fall back to the flat text when absent.
+    const utterances = (transcript.utterances ?? null) as
+      | { speaker?: string; transcript?: string }[]
+      | null;
+    if (Array.isArray(utterances) && utterances.length > 0) {
+      const nameFor = (speaker?: string) => {
+        const match = speakers.find((s) => s.label === speaker);
+        return match?.identifiedName?.trim() || speaker || "Speaker";
+      };
+      for (const u of utterances) {
+        if (!u?.transcript) continue;
+        parts.push(`**${nameFor(u.speaker)}:** ${u.transcript}`, "");
+      }
+    } else {
+      parts.push(transcript.transcript ?? "(sin transcripción)");
+    }
+
+    return parts.join("\n");
+  }
+
+  /**
+   * The id of `attachment.file`, which `createFileUpload` needs to know which
+   * field the upload belongs to. Two cheap queries (~4 KB), then cached.
+   */
+  private async resolveAttachmentFileFieldId(baseUrl: string, apiKey: string): Promise<string> {
+    const cached = attachmentFileFieldIds.get(baseUrl);
+    if (cached) return cached;
+
+    const objects = await this.metadataGraphql<{
+      objects: { edges: { node: { id: string; nameSingular: string } }[] };
+    }>(baseUrl, apiKey, `{ objects(paging: { first: 500 }) { edges { node { id nameSingular } } } }`);
+
+    const attachmentObject = objects.objects.edges
+      .map((e) => e.node)
+      .find((n) => n.nameSingular === "attachment");
+    if (!attachmentObject) throw new Error("Twenty has no `attachment` object in this workspace");
+
+    // ObjectFilter can't filter by name, but FieldFilter takes objectMetadataId,
+    // which keeps this from pulling every field of every object.
+    const fields = await this.metadataGraphql<{
+      fields: { edges: { node: { id: string; name: string; type: string } }[] };
+    }>(
+      baseUrl,
+      apiKey,
+      `query($objectId: UUID!) {
+         fields(paging: { first: 200 }, filter: { objectMetadataId: { eq: $objectId } }) {
+           edges { node { id name type } }
+         }
+       }`,
+      { objectId: attachmentObject.id },
+    );
+
+    const fileField = fields.fields.edges.map((e) => e.node).find((f) => f.name === "file");
+    if (!fileField) throw new Error("Twenty's attachment object has no `file` field");
+
+    attachmentFileFieldIds.set(baseUrl, fileField.id);
+    return fileField.id;
+  }
+
+  /**
+   * Upload the transcript and attach it to the company record.
+   *
+   * Returns the attachment id. Callers treat failure as non-fatal: a meeting
+   * note without its transcript file is still worth having, and losing the note
+   * over a failed upload would be a bad trade.
+   */
+  public async attachTranscriptToCompany(
+    baseUrl: string,
+    apiKey: string,
+    transcript: Transcript,
+    companyId: string,
+  ): Promise<{ attachmentId: string; filename: string }> {
+    const content = this.buildTranscriptFileMarkdown(transcript);
+    const bytes = Buffer.from(content, "utf8");
+
+    const dateSlug = (transcript.recordedAt ?? transcript.createdAt).toISOString().slice(0, 10);
+    const titleSlug = (transcript.title?.trim() || "reunion")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // strip the accents NFD just split off
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 60);
+    const filename = `${dateSlug}-${titleSlug || "reunion"}.md`;
+
+    const fieldMetadataId = await this.resolveAttachmentFileFieldId(baseUrl, apiKey);
+
+    const target = await this.metadataGraphql<{
+      createFileUpload: { fileId: string; uploadUrl: string; contentType: string };
+    }>(
+      baseUrl,
+      apiKey,
+      `mutation($filename: String!, $size: Float!, $fileFolder: FileFolder!, $fieldMetadataId: String) {
+         createFileUpload(filename: $filename, size: $size, fileFolder: $fileFolder, fieldMetadataId: $fieldMetadataId) {
+           fileId uploadUrl contentType
+         }
+       }`,
+      { filename, size: bytes.byteLength, fileFolder: TWENTY_FILE_FOLDER, fieldMetadataId },
+    );
+
+    const { fileId, uploadUrl, contentType } = target.createFileUpload;
+
+    // No Authorization header here on purpose — the presigned URL carries its
+    // own signature, and some storage backends reject the extra header.
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: bytes,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!put.ok) {
+      const body = await put.text().catch(() => "");
+      throw new Error(`Twenty file upload ${put.status} ${put.statusText}: ${body.slice(0, 200)}`);
+    }
+
+    const completed = await this.metadataGraphql<{ completeFileUpload: { path: string } }>(
+      baseUrl,
+      apiKey,
+      `mutation($fileId: String!) { completeFileUpload(fileId: $fileId) { id path size url } }`,
+      { fileId },
+    );
+
+    const created = await this.fetchTwenty<unknown>(baseUrl, apiKey, "/attachments", {
+      method: "POST",
+      body: JSON.stringify({
+        name: filename,
+        file: [{ fileId, label: filename }],
+        fullPath: completed.completeFileUpload.path,
+        fileCategory: TWENTY_TEXT_DOCUMENT_CATEGORY,
+        targetCompanyId: companyId,
+      }),
+    });
+
+    const attachment = this.unwrap<Record<string, unknown>>(created, "createAttachment");
+    const attachmentId = String(attachment?.id ?? "");
+    if (!attachmentId) throw new Error("Twenty did not return an attachment id");
+
+    return { attachmentId, filename };
+  }
+
   private async createNoteWithTargets(
     baseUrl: string,
     apiKey: string,
@@ -465,10 +702,38 @@ class TwentyIntegrationService {
             data: { noteId: note.noteId, url: note.url },
           });
 
+          // Attach the full transcript to the company. Only on the canonical
+          // push — a SECONDARY recording of the same meeting must not upload a
+          // second copy of the same conversation.
+          //
+          // Non-fatal by design: the note is the valuable part, and it is
+          // already created and linked by this point. logger.error so a broken
+          // upload still reaches Sentry instead of disappearing.
+          let attachmentId: string | undefined;
+          try {
+            const attached = await this.attachTranscriptToCompany(
+              integration.baseUrl,
+              integration.apiKey,
+              transcript,
+              args.companyId,
+            );
+            attachmentId = attached.attachmentId;
+            logger.info(
+              `[twenty] attached transcript ${transcript.id} to company ${args.companyId} as ${attached.filename}`,
+            );
+          } catch (attachError) {
+            logger.error(
+              `[twenty] note ${note.noteId} created but the transcript file could not be attached`,
+              attachError,
+              { noteId: note.noteId, companyId: args.companyId, transcriptId: transcript.id },
+            );
+          }
+
           await this.markTranscript(transcript.id, metadata, {
             noteId: note.noteId,
             url: note.url,
             role: "CANONICAL",
+            attachmentId,
             syncedAt: new Date().toISOString(),
           });
 

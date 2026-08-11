@@ -99,6 +99,11 @@ export interface TwentyNoteRef {
   role: "CANONICAL" | "SECONDARY";
   /** Set when role is SECONDARY: the transcript that actually produced the note. */
   canonicalTranscriptId?: string;
+  /**
+   * The full transcript uploaded as a file on the company record. Absent when
+   * the upload failed — the note is still valid, so this is not an error state.
+   */
+  attachmentId?: string;
   syncedAt?: string;
 }
 
