@@ -65,10 +65,14 @@ const mockTwenty = () => {
     if (href.endsWith("/metadata")) {
       const query = JSON.parse(body).query as string;
       if (query.includes("objects(")) {
-        return json({ data: { objects: { edges: [{ node: { id: "obj-att", nameSingular: "attachment" } }] } } });
+        return json({
+          data: { objects: { edges: [{ node: { id: "obj-att", nameSingular: "attachment" } }] } },
+        });
       }
       if (query.includes("fields(")) {
-        return json({ data: { fields: { edges: [{ node: { id: "fld-file", name: "file", type: "FILES" } }] } } });
+        return json({
+          data: { fields: { edges: [{ node: { id: "fld-file", name: "file", type: "FILES" } }] } },
+        });
       }
       if (query.includes("createFileUpload")) {
         return json({
@@ -82,7 +86,9 @@ const mockTwenty = () => {
         });
       }
       if (query.includes("completeFileUpload")) {
-        return json({ data: { completeFileUpload: { id: "file-1", path: "files-field/x/file-1.md" } } });
+        return json({
+          data: { completeFileUpload: { id: "file-1", path: "files-field/x/file-1.md" } },
+        });
       }
     }
     if (href.startsWith("https://storage.example.com")) {

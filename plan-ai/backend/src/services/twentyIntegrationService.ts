@@ -462,7 +462,11 @@ class TwentyIntegrationService {
 
     const objects = await this.metadataGraphql<{
       objects: { edges: { node: { id: string; nameSingular: string } }[] };
-    }>(baseUrl, apiKey, `{ objects(paging: { first: 500 }) { edges { node { id nameSingular } } } }`);
+    }>(
+      baseUrl,
+      apiKey,
+      `{ objects(paging: { first: 500 }) { edges { node { id nameSingular } } } }`,
+    );
 
     const attachmentObject = objects.objects.edges
       .map((e) => e.node)

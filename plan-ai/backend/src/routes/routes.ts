@@ -919,6 +919,8 @@ const models: TsoaRoute.Models = {
             "url": {"dataType":"string"},
             "role": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["CANONICAL"]},{"dataType":"enum","enums":["SECONDARY"]}],"required":true},
             "canonicalTranscriptId": {"dataType":"string"},
+            "attachmentId": {"dataType":"string"},
+            "timelineActivityId": {"dataType":"string"},
             "syncedAt": {"dataType":"string"},
         },
         "additionalProperties": false,

@@ -3414,6 +3414,13 @@ export interface components {
             role: "CANONICAL" | "SECONDARY";
             /** @description Set when role is SECONDARY: the transcript that actually produced the note. */
             canonicalTranscriptId?: string;
+            /**
+             * @description The full transcript uploaded as a file on the company record. Absent when
+             *     the upload failed — the note is still valid, so this is not an error state.
+             */
+            attachmentId?: string;
+            /** @description Timeline entry on the company, stamped at the real meeting time. */
+            timelineActivityId?: string;
             syncedAt?: string;
         };
         /**
