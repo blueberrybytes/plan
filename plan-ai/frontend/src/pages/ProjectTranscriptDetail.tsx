@@ -37,6 +37,7 @@ import ReactJson from "react-json-view";
 import MermaidRenderer from "../components/common/MermaidRenderer";
 import { AiGraphTrace, ContextGraph } from "../components/project/ContextGraph";
 import PostMeetingTasksPanel from "../components/project/PostMeetingTasksPanel";
+import TwentyPushCard from "../components/project/TwentyPushCard";
 import PainPointsPanel from "../components/project/PainPointsPanel";
 import ExtractionReasoningPanel from "../components/transcripts/ExtractionReasoningPanel";
 import SpeakerInsightsTab, {
@@ -695,6 +696,12 @@ const ProjectTranscriptDetail: React.FC = () => {
             <PostMeetingTasksPanel
               tasks={(transcript.metadata as TranscriptMetadata | null)?.postMeetingTasks}
               transcriptId={transcript.id}
+            />
+
+            <TwentyPushCard
+              transcriptId={transcript.id}
+              speakers={(transcript.metadata as TranscriptMetadata | null)?.speakers}
+              twentyRef={(transcript.metadata as TranscriptMetadata | null)?.twenty}
             />
 
             {transcript.chatThread && transcript.chatThread.messages.length > 0 && (

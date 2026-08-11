@@ -22,6 +22,7 @@ import { diagramApi } from "./apis/diagramApi";
 import { aiApi } from "./apis/aiApi";
 import { taskApi } from "./apis/taskApi";
 import { trelloApi } from "./apis/trelloApi";
+import { twentyApi } from "./apis/twentyApi";
 import { notionApi } from "./apis/notionApi";
 import { asanaApi } from "./apis/asanaApi";
 import { aiUsageApi } from "./apis/aiUsageApi";
@@ -86,6 +87,7 @@ const store = configureStore({
       aiApi.middleware,
       taskApi.middleware,
       trelloApi.middleware,
+      twentyApi.middleware,
       notionApi.middleware,
       asanaApi.middleware,
       aiUsageApi.middleware,

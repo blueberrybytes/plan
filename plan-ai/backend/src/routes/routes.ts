@@ -8,6 +8,8 @@ import { VersionController } from './../controller/versionController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { UserController } from './../controller/userController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { TwentyController } from './../controller/twentyController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { TrelloController } from './../controller/trelloController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ProjectsModelController } from './../controller/projectsModelController';
@@ -185,6 +187,94 @@ const models: TsoaRoute.Models = {
     "ApiResponse_null_": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string"},"data":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":[null]},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TwentyManualConnectRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "baseUrl": {"dataType":"string","required":true},
+            "apiKey": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TwentySummaryResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "connected": {"dataType":"boolean","required":true},
+            "baseUrl": {"dataType":"string"},
+            "workspaceName": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_TwentySummaryResponse_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string"},"data":{"dataType":"union","subSchemas":[{"ref":"TwentySummaryResponse"},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TwentyCompanyItem": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "name": {"dataType":"string","required":true},
+            "domainName": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_TwentyCompanyItem-Array_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string"},"data":{"dataType":"union","subSchemas":[{"dataType":"array","array":{"dataType":"refObject","ref":"TwentyCompanyItem"}},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TwentyPersonItem": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "name": {"dataType":"string","required":true},
+            "email": {"dataType":"string"},
+            "companyId": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_TwentyPersonItem-Array_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string"},"data":{"dataType":"union","subSchemas":[{"dataType":"array","array":{"dataType":"refObject","ref":"TwentyPersonItem"}},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TwentyPushOutcome": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["CREATED"]},{"dataType":"enum","enums":["ALREADY_PUSHED"]},{"dataType":"enum","enums":["DEDUPED"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "PushTranscriptToTwentyResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "outcome": {"ref":"TwentyPushOutcome","required":true},
+            "noteId": {"dataType":"string","required":true},
+            "url": {"dataType":"string"},
+            "canonicalTranscriptId": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_PushTranscriptToTwentyResponse-or-null_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string"},"data":{"dataType":"union","subSchemas":[{"dataType":"union","subSchemas":[{"ref":"PushTranscriptToTwentyResponse"},{"dataType":"enum","enums":[null]}]},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "PushTranscriptToTwentyRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "transcriptId": {"dataType":"string","required":true},
+            "companyId": {"dataType":"string","required":true},
+            "personIds": {"dataType":"array","array":{"dataType":"string"}},
+            "opportunityId": {"dataType":"string"},
+            "forceSeparateNote": {"dataType":"boolean"},
+        },
+        "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TrelloManualConnectRequest": {
@@ -789,12 +879,33 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "Partial_Record_PostMeetingTaskKind.PostMeetingTaskStatus__": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"jira":{"ref":"PostMeetingTaskStatus"},"linear":{"ref":"PostMeetingTaskStatus"},"trello":{"ref":"PostMeetingTaskStatus"},"notion":{"ref":"PostMeetingTaskStatus"},"asana":{"ref":"PostMeetingTaskStatus"},"googleDrive":{"ref":"PostMeetingTaskStatus"},"oneDrive":{"ref":"PostMeetingTaskStatus"},"doc":{"ref":"PostMeetingTaskStatus"},"slides":{"ref":"PostMeetingTaskStatus"}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"jira":{"ref":"PostMeetingTaskStatus"},"linear":{"ref":"PostMeetingTaskStatus"},"trello":{"ref":"PostMeetingTaskStatus"},"notion":{"ref":"PostMeetingTaskStatus"},"asana":{"ref":"PostMeetingTaskStatus"},"googleDrive":{"ref":"PostMeetingTaskStatus"},"oneDrive":{"ref":"PostMeetingTaskStatus"},"doc":{"ref":"PostMeetingTaskStatus"},"slides":{"ref":"PostMeetingTaskStatus"},"twenty":{"ref":"PostMeetingTaskStatus"}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "PostMeetingTasksRecord": {
         "dataType": "refAlias",
         "type": {"ref":"Partial_Record_PostMeetingTaskKind.PostMeetingTaskStatus__","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TwentyNoteRef": {
+        "dataType": "refObject",
+        "properties": {
+            "noteId": {"dataType":"string","required":true},
+            "url": {"dataType":"string"},
+            "role": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["CANONICAL"]},{"dataType":"enum","enums":["SECONDARY"]}],"required":true},
+            "canonicalTranscriptId": {"dataType":"string"},
+            "syncedAt": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "RecordingWindow": {
+        "dataType": "refObject",
+        "properties": {
+            "startedAt": {"dataType":"string","required":true},
+            "wallClockSeconds": {"dataType":"double"},
+        },
+        "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TranscriptMetadata": {
@@ -810,6 +921,8 @@ const models: TsoaRoute.Models = {
             "speakers": {"dataType":"array","array":{"dataType":"refObject","ref":"SpeakerInsight"}},
             "speakerNameOverrides": {"ref":"Record_string.string_"},
             "postMeetingTasks": {"ref":"PostMeetingTasksRecord"},
+            "twenty": {"ref":"TwentyNoteRef"},
+            "recording": {"ref":"RecordingWindow"},
         },
         "additionalProperties": false,
     },
@@ -944,7 +1057,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "PostMeetingTaskKind": {
         "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["jira"]},{"dataType":"enum","enums":["linear"]},{"dataType":"enum","enums":["trello"]},{"dataType":"enum","enums":["notion"]},{"dataType":"enum","enums":["asana"]},{"dataType":"enum","enums":["googleDrive"]},{"dataType":"enum","enums":["oneDrive"]},{"dataType":"enum","enums":["doc"]},{"dataType":"enum","enums":["slides"]}],"validators":{}},
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["jira"]},{"dataType":"enum","enums":["linear"]},{"dataType":"enum","enums":["trello"]},{"dataType":"enum","enums":["notion"]},{"dataType":"enum","enums":["asana"]},{"dataType":"enum","enums":["googleDrive"]},{"dataType":"enum","enums":["oneDrive"]},{"dataType":"enum","enums":["doc"]},{"dataType":"enum","enums":["slides"]},{"dataType":"enum","enums":["twenty"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TaskCategory": {
@@ -1489,7 +1602,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "_36_Enums.IntegrationProvider": {
         "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["JIRA"]},{"dataType":"enum","enums":["LINEAR"]},{"dataType":"enum","enums":["GITHUB"]},{"dataType":"enum","enums":["GOOGLE_DRIVE"]},{"dataType":"enum","enums":["TRELLO"]},{"dataType":"enum","enums":["NOTION"]},{"dataType":"enum","enums":["ONEDRIVE"]},{"dataType":"enum","enums":["ASANA"]}],"validators":{}},
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["JIRA"]},{"dataType":"enum","enums":["LINEAR"]},{"dataType":"enum","enums":["GITHUB"]},{"dataType":"enum","enums":["GOOGLE_DRIVE"]},{"dataType":"enum","enums":["TRELLO"]},{"dataType":"enum","enums":["NOTION"]},{"dataType":"enum","enums":["ONEDRIVE"]},{"dataType":"enum","enums":["ASANA"]},{"dataType":"enum","enums":["TWENTY"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "IntegrationProvider": {
@@ -2589,6 +2702,165 @@ export function RegisterRoutes(app: Router,opts?:{multer?:ReturnType<typeof mult
 
               await templateService.apiHandler({
                 methodName: 'deleteUser',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTwentyController_manualConnect: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                body: {"in":"body","name":"body","required":true,"ref":"TwentyManualConnectRequest"},
+        };
+        app.post('/api/twenty/manual-connect',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController)),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController.prototype.manualConnect)),
+
+            async function TwentyController_manualConnect(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTwentyController_manualConnect, request, response });
+
+                const controller = new TwentyController();
+
+              await templateService.apiHandler({
+                methodName: 'manualConnect',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTwentyController_getSummary: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+        };
+        app.get('/api/twenty/summary',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController)),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController.prototype.getSummary)),
+
+            async function TwentyController_getSummary(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTwentyController_getSummary, request, response });
+
+                const controller = new TwentyController();
+
+              await templateService.apiHandler({
+                methodName: 'getSummary',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTwentyController_searchCompanies: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                q: {"in":"query","name":"q","dataType":"string"},
+        };
+        app.get('/api/twenty/companies',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController)),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController.prototype.searchCompanies)),
+
+            async function TwentyController_searchCompanies(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTwentyController_searchCompanies, request, response });
+
+                const controller = new TwentyController();
+
+              await templateService.apiHandler({
+                methodName: 'searchCompanies',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTwentyController_searchPeople: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                q: {"in":"query","name":"q","dataType":"string"},
+        };
+        app.get('/api/twenty/people',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController)),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController.prototype.searchPeople)),
+
+            async function TwentyController_searchPeople(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTwentyController_searchPeople, request, response });
+
+                const controller = new TwentyController();
+
+              await templateService.apiHandler({
+                methodName: 'searchPeople',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTwentyController_pushTranscript: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                body: {"in":"body","name":"body","required":true,"ref":"PushTranscriptToTwentyRequest"},
+        };
+        app.post('/api/twenty/push-transcript',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController)),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController.prototype.pushTranscript)),
+
+            async function TwentyController_pushTranscript(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTwentyController_pushTranscript, request, response });
+
+                const controller = new TwentyController();
+
+              await templateService.apiHandler({
+                methodName: 'pushTranscript',
                 controller,
                 response,
                 next,
@@ -3875,6 +4147,8 @@ export function RegisterRoutes(app: Router,opts?:{multer?:ReturnType<typeof mult
                 createSlides: {"in":"formData","name":"createSlides","dataType":"string"},
                 language: {"in":"formData","name":"language","dataType":"string"},
                 aecTelemetry: {"in":"formData","name":"aecTelemetry","dataType":"string"},
+                recordingStartedAt: {"in":"formData","name":"recordingStartedAt","dataType":"string"},
+                recordingWallClockSeconds: {"in":"formData","name":"recordingWallClockSeconds","dataType":"string"},
                 micFile: {"in":"formData","name":"micFile","dataType":"file"},
                 sysFile: {"in":"formData","name":"sysFile","dataType":"file"},
         };

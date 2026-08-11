@@ -351,6 +351,12 @@ const Recording: React.FC = () => {
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Real wall-clock instant capture began — NOT derived from `elapsed` (which
+  // only ticks once the timer interval starts and drifts under tab throttling).
+  // Sent with the upload so the backend can tell whether two teammates'
+  // recordings of the same meeting overlap; `recordedAt` alone is upload time,
+  // useless for that comparison.
+  const recordingStartedAtRef = useRef<Date | null>(null);
   const typescriptNullBoxRef_ignoreThis = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef<boolean>(false);
   const transcriptBoxRef = useRef<HTMLDivElement>(null);
@@ -736,9 +742,14 @@ const Recording: React.FC = () => {
         targetProjectId = newProject.id;
       }
 
+      const startedAt = recordingStartedAtRef.current;
       const savedTranscript = await api.saveRecording({
         content: fullPayload,
         recordedAt: new Date().toISOString(),
+        recordingStartedAt: startedAt ? startedAt.toISOString() : undefined,
+        recordingWallClockSeconds: startedAt
+          ? Math.round((Date.now() - startedAt.getTime()) / 1000)
+          : undefined,
         projectId: targetProjectId,
         // Selected ASR language ("" = auto) — persisted so the backend's batch
         // re-diarization uses it instead of "multi" (which has no Catalan).
@@ -934,6 +945,8 @@ const Recording: React.FC = () => {
   // Start recorder on mount
   useEffect(() => {
     if (!token) return;
+
+    recordingStartedAtRef.current = new Date();
 
     const recorder = new AudioRecorder({
       api,

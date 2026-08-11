@@ -7,7 +7,8 @@ export type PostMeetingTaskKind =
   | "googleDrive"
   | "oneDrive"
   | "doc"
-  | "slides";
+  | "slides"
+  | "twenty";
 
 export interface PostMeetingTaskStatus {
   status: "PENDING" | "OK" | "FAILED" | "SKIPPED";
@@ -77,4 +78,42 @@ export interface TranscriptMetadata {
   speakerNameOverrides?: Record<string, string>;
   /** Per-step status of fire-and-forget effects kicked off after a transcript is processed */
   postMeetingTasks?: PostMeetingTasksRecord;
+  /** Result of pushing this meeting to Twenty CRM. */
+  twenty?: TwentyNoteRef;
+  /** Real capture window reported by the client, when it sent one. */
+  recording?: RecordingWindow;
+}
+
+/**
+ * Where this transcript ended up in Twenty.
+ *
+ * `CANONICAL` — this recording's content became the CRM note.
+ * `SECONDARY` — a teammate recorded the same meeting and their note won; we
+ * deliberately did NOT create a second note in the client's CRM, and point at
+ * theirs instead. The user can override this from the UI if the overlap test
+ * got it wrong (two genuinely different meetings with the same company).
+ */
+export interface TwentyNoteRef {
+  noteId: string;
+  url?: string;
+  role: "CANONICAL" | "SECONDARY";
+  /** Set when role is SECONDARY: the transcript that actually produced the note. */
+  canonicalTranscriptId?: string;
+  syncedAt?: string;
+}
+
+/**
+ * Capture window as measured by the recording client.
+ *
+ * `Transcript.recordedAt` is the UPLOAD time and `durationSeconds` is derived
+ * from the last utterance — neither is the true meeting start. Two teammates
+ * recording the same call upload at different moments, so comparing those
+ * fields alone is unreliable. When the client reports these, overlap detection
+ * uses them instead.
+ */
+export interface RecordingWindow {
+  /** ISO-8601 UTC instant capture actually started. */
+  startedAt: string;
+  /** Wall-clock seconds from start to stop (includes pauses, unlike durationSeconds). */
+  wallClockSeconds?: number;
 }

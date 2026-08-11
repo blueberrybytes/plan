@@ -462,6 +462,16 @@
         "description": "Connect your Asana workspace to automatically push AI-generated tasks to your projects and boards.",
         "connectCta": "Connect Asana",
         "notConnected": "Asana is not connected yet."
+      },
+      "twenty": {
+        "label": "Twenty CRM",
+        "description": "Connect your self-hosted Twenty CRM to push meeting notes straight to the right company, people and opportunity.",
+        "connectCta": "Connect Twenty",
+        "notConnected": "Twenty is not connected yet.",
+        "connectHeading": "Connect your Twenty instance",
+        "connectHelp": "Twenty is self-hosted, so we need your instance URL and an API key. Create one in your Twenty workspace under Settings → API & Webhooks → + Create key.",
+        "baseUrlLabel": "Twenty instance URL",
+        "apiKeyLabel": "API key"
       }
     },
     "connectedDetails": {

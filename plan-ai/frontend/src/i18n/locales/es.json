@@ -456,6 +456,16 @@
         "description": "Conecta tu espacio de trabajo de Asana para sincronizar tareas generadas por IA con tus proyectos y tableros.",
         "connectCta": "Conectar Asana",
         "notConnected": "Asana aún no está conectado."
+      },
+      "twenty": {
+        "label": "Twenty CRM",
+        "description": "Conecta tu Twenty CRM (self-hosted) para enviar las actas de tus reuniones directamente a la empresa, las personas y la oportunidad correctas.",
+        "connectCta": "Conectar Twenty",
+        "notConnected": "Twenty aún no está conectado.",
+        "connectHeading": "Conecta tu instancia de Twenty",
+        "connectHelp": "Twenty es self-hosted, así que necesitamos la URL de tu instancia y una API key. Créala en tu workspace de Twenty en Settings → API & Webhooks → + Create key.",
+        "baseUrlLabel": "URL de la instancia de Twenty",
+        "apiKeyLabel": "API key"
       }
     },
     "connectedDetails": {

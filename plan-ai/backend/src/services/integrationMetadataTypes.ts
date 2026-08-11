@@ -55,6 +55,17 @@ export interface AsanaIntegrationMetadata extends BaseIntegrationMetadata {
   defaultProjectGid?: string;
 }
 
+export interface TwentyIntegrationMetadata extends BaseIntegrationMetadata {
+  authType: "API_KEY";
+  /**
+   * Root of the customer's Twenty instance, e.g. "https://crm.acme.com".
+   * Twenty is typically self-hosted, so unlike every other provider here the
+   * API host is per-workspace. Stored normalized (https, no trailing slash).
+   */
+  baseUrl: string;
+  workspaceName?: string;
+}
+
 export type IntegrationMetadata =
   | JiraIntegrationMetadata
   | LinearIntegrationMetadata
@@ -63,4 +74,5 @@ export type IntegrationMetadata =
   | TrelloIntegrationMetadata
   | NotionIntegrationMetadata
   | MicrosoftIntegrationMetadata
-  | AsanaIntegrationMetadata;
+  | AsanaIntegrationMetadata
+  | TwentyIntegrationMetadata;

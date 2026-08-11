@@ -21,6 +21,7 @@ import { diagramApi } from "./apis/diagramApi";
 import { aiApi } from "./apis/aiApi";
 import { taskApi } from "./apis/taskApi";
 import { trelloApi } from "./apis/trelloApi";
+import { twentyApi } from "./apis/twentyApi";
 import { notionApi } from "./apis/notionApi";
 import { asanaApi } from "./apis/asanaApi";
 import { aiUsageApi } from "./apis/aiUsageApi";
@@ -54,6 +55,7 @@ const appReducers = combineReducers({
   [aiApi.reducerPath]: aiApi.reducer,
   [taskApi.reducerPath]: taskApi.reducer,
   [trelloApi.reducerPath]: trelloApi.reducer,
+  [twentyApi.reducerPath]: twentyApi.reducer,
   [notionApi.reducerPath]: notionApi.reducer,
   [asanaApi.reducerPath]: asanaApi.reducer,
   [aiUsageApi.reducerPath]: aiUsageApi.reducer,
@@ -94,6 +96,7 @@ const rootReducers = (state: any, action: any) => {
       [aiApi.reducerPath]: undefined,
       [taskApi.reducerPath]: undefined,
       [trelloApi.reducerPath]: undefined,
+      [twentyApi.reducerPath]: undefined,
       [notionApi.reducerPath]: undefined,
       [asanaApi.reducerPath]: undefined,
       [aiUsageApi.reducerPath]: undefined,

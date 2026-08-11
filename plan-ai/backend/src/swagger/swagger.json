@@ -264,6 +264,236 @@
 				],
 				"type": "object"
 			},
+			"TwentyManualConnectRequest": {
+				"properties": {
+					"baseUrl": {
+						"type": "string",
+						"description": "Root of the Twenty instance, e.g. \"https://crm.acme.com\"."
+					},
+					"apiKey": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"baseUrl",
+					"apiKey"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"TwentySummaryResponse": {
+				"properties": {
+					"connected": {
+						"type": "boolean"
+					},
+					"baseUrl": {
+						"type": "string"
+					},
+					"workspaceName": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"connected"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_TwentySummaryResponse_": {
+				"properties": {
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/TwentySummaryResponse"
+							}
+						],
+						"nullable": true
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"data",
+					"status"
+				],
+				"type": "object"
+			},
+			"TwentyCompanyItem": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"domainName": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_TwentyCompanyItem-Array_": {
+				"properties": {
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"items": {
+							"$ref": "#/components/schemas/TwentyCompanyItem"
+						},
+						"type": "array",
+						"nullable": true
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"data",
+					"status"
+				],
+				"type": "object"
+			},
+			"TwentyPersonItem": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"email": {
+						"type": "string"
+					},
+					"companyId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_TwentyPersonItem-Array_": {
+				"properties": {
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"items": {
+							"$ref": "#/components/schemas/TwentyPersonItem"
+						},
+						"type": "array",
+						"nullable": true
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"data",
+					"status"
+				],
+				"type": "object"
+			},
+			"TwentyPushOutcome": {
+				"type": "string",
+				"enum": [
+					"CREATED",
+					"ALREADY_PUSHED",
+					"DEDUPED"
+				]
+			},
+			"PushTranscriptToTwentyResponse": {
+				"properties": {
+					"outcome": {
+						"$ref": "#/components/schemas/TwentyPushOutcome"
+					},
+					"noteId": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"canonicalTranscriptId": {
+						"type": "string",
+						"description": "Present when outcome is DEDUPED — the recording that won."
+					}
+				},
+				"required": [
+					"outcome",
+					"noteId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_PushTranscriptToTwentyResponse-or-null_": {
+				"properties": {
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/PushTranscriptToTwentyResponse"
+							}
+						],
+						"nullable": true
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"data",
+					"status"
+				],
+				"type": "object"
+			},
+			"PushTranscriptToTwentyRequest": {
+				"properties": {
+					"transcriptId": {
+						"type": "string"
+					},
+					"companyId": {
+						"type": "string"
+					},
+					"personIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"opportunityId": {
+						"type": "string"
+					},
+					"forceSeparateNote": {
+						"type": "boolean",
+						"description": "Set by the UI when the user rejects an automatic \"same meeting\" match and\ninsists this really is a separate meeting deserving its own note."
+					}
+				},
+				"required": [
+					"transcriptId",
+					"companyId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"TrelloManualConnectRequest": {
 				"properties": {
 					"apiKey": {
@@ -2117,6 +2347,9 @@
 					},
 					"slides": {
 						"$ref": "#/components/schemas/PostMeetingTaskStatus"
+					},
+					"twenty": {
+						"$ref": "#/components/schemas/PostMeetingTaskStatus"
 					}
 				},
 				"type": "object",
@@ -2124,6 +2357,56 @@
 			},
 			"PostMeetingTasksRecord": {
 				"$ref": "#/components/schemas/Partial_Record_PostMeetingTaskKind.PostMeetingTaskStatus__"
+			},
+			"TwentyNoteRef": {
+				"description": "Where this transcript ended up in Twenty.\n\n`CANONICAL` — this recording's content became the CRM note.\n`SECONDARY` — a teammate recorded the same meeting and their note won; we\ndeliberately did NOT create a second note in the client's CRM, and point at\ntheirs instead. The user can override this from the UI if the overlap test\ngot it wrong (two genuinely different meetings with the same company).",
+				"properties": {
+					"noteId": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"role": {
+						"type": "string",
+						"enum": [
+							"CANONICAL",
+							"SECONDARY"
+						]
+					},
+					"canonicalTranscriptId": {
+						"type": "string",
+						"description": "Set when role is SECONDARY: the transcript that actually produced the note."
+					},
+					"syncedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"noteId",
+					"role"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"RecordingWindow": {
+				"description": "Capture window as measured by the recording client.\n\n`Transcript.recordedAt` is the UPLOAD time and `durationSeconds` is derived\nfrom the last utterance — neither is the true meeting start. Two teammates\nrecording the same call upload at different moments, so comparing those\nfields alone is unreliable. When the client reports these, overlap detection\nuses them instead.",
+				"properties": {
+					"startedAt": {
+						"type": "string",
+						"description": "ISO-8601 UTC instant capture actually started."
+					},
+					"wallClockSeconds": {
+						"type": "number",
+						"format": "double",
+						"description": "Wall-clock seconds from start to stop (includes pauses, unlike durationSeconds)."
+					}
+				},
+				"required": [
+					"startedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
 			},
 			"TranscriptMetadata": {
 				"properties": {
@@ -2194,6 +2477,14 @@
 					"postMeetingTasks": {
 						"$ref": "#/components/schemas/PostMeetingTasksRecord",
 						"description": "Per-step status of fire-and-forget effects kicked off after a transcript is processed"
+					},
+					"twenty": {
+						"$ref": "#/components/schemas/TwentyNoteRef",
+						"description": "Result of pushing this meeting to Twenty CRM."
+					},
+					"recording": {
+						"$ref": "#/components/schemas/RecordingWindow",
+						"description": "Real capture window reported by the client, when it sent one."
 					}
 				},
 				"type": "object",
@@ -2700,7 +2991,8 @@
 					"googleDrive",
 					"oneDrive",
 					"doc",
-					"slides"
+					"slides",
+					"twenty"
 				]
 			},
 			"TaskCategory": {
@@ -4349,7 +4641,8 @@
 					"TRELLO",
 					"NOTION",
 					"ONEDRIVE",
-					"ASANA"
+					"ASANA",
+					"TWENTY"
 				]
 			},
 			"IntegrationProvider": {
@@ -7860,6 +8153,205 @@
 				]
 			}
 		},
+		"/api/twenty/manual-connect": {
+			"post": {
+				"operationId": "ManualConnect",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Validation Error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Integrations"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TwentyManualConnectRequest"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/twenty/summary": {
+			"get": {
+				"operationId": "GetSummary",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_TwentySummaryResponse_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Integrations"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": []
+			}
+		},
+		"/api/twenty/companies": {
+			"get": {
+				"operationId": "SearchCompanies",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_TwentyCompanyItem-Array_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Integrations"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "q",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/twenty/people": {
+			"get": {
+				"operationId": "SearchPeople",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_TwentyPersonItem-Array_"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Integrations"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "q",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/twenty/push-transcript": {
+			"post": {
+				"operationId": "PushTranscript",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_PushTranscriptToTwentyResponse-or-null_"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Validation Error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Transcript not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"description": "Push a meeting into Twenty as a note linked to the company (and people).\nDeduplicated server-side: if a teammate already pushed the same meeting,\nthis returns their note instead of creating a second one.",
+				"tags": [
+					"Integrations"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PushTranscriptToTwentyRequest"
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/trello/manual-connect": {
 			"post": {
 				"operationId": "ManualConnect",
@@ -9713,6 +10205,12 @@
 										"type": "string"
 									},
 									"aecTelemetry": {
+										"type": "string"
+									},
+									"recordingStartedAt": {
+										"type": "string"
+									},
+									"recordingWallClockSeconds": {
 										"type": "string"
 									},
 									"micFile": {

@@ -81,6 +81,7 @@ model Workspace {
 
   members        WorkspaceMember[]
   integrations   WorkspaceIntegration[]
+  crmNotes       MeetingCrmNote[]
   projects       Project[]
   contexts       Context[]
   transcripts    Transcript[]
@@ -226,6 +227,44 @@ model WorkspaceIntegration {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, provider])
+}
+
+/// Idempotency ledger for "meeting → CRM note" pushes (currently just Twenty).
+/// The unique constraint is the whole mechanism: two workers racing to push the
+/// SAME meeting (e.g. two teammates who each recorded the same client call)
+/// collide on (workspaceId, provider, externalCompanyId, dayBucket) via a
+/// Postgres unique-violation (P2002) instead of a SELECT-then-INSERT race.
+/// The loser reads the winning row, tests real time overlap, and either backs
+/// off (same meeting — don't create a second note) or retries with a
+/// suffixed dayBucket (genuinely two different meetings with that company the
+/// same day). See TWENTY.md for the full algorithm.
+model MeetingCrmNote {
+  id          String   @id @default(cuid())
+  workspaceId String
+  /// Reusing IntegrationProvider so this ledger generalizes past Twenty later.
+  provider    IntegrationProvider
+  /// The CRM-side record this note is attached to (Twenty companyId).
+  externalCompanyId String
+  /// Local calendar day the meeting happened on, e.g. "2026-08-11". Suffixed
+  /// ("2026-08-11#2") when a second, genuinely distinct meeting with the same
+  /// company on the same day needs its own note.
+  dayBucket   String
+  noteId      String
+  url         String?
+  /// The transcript whose content became the note — informational only, no FK:
+  /// deleting that transcript must never cascade-delete the CRM ledger row,
+  /// since the note still exists for real inside the client's CRM.
+  canonicalTranscriptId String
+  /// Best-effort real meeting interval (see TWENTY.md — recordedAt is upload
+  /// time, not start time), used by the overlap test on collision.
+  startedAt   DateTime
+  endedAt     DateTime
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider, externalCompanyId, dayBucket])
+  @@index([workspaceId, startedAt])
 }
 
 model WorkspaceInvitation {
@@ -419,6 +458,8 @@ model Transcript {
   @@index([source])
   @@index([userId])
   @@index([createdAt])
+  /// Supports the "did a teammate already record this same slot?" lookup.
+  @@index([workspaceId, recordedAt])
 }
 
 model Task {
@@ -826,6 +867,7 @@ enum IntegrationProvider {
   NOTION
   ONEDRIVE
   ASANA
+  TWENTY
 }
 
 enum IntegrationStatus {

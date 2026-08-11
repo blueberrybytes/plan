@@ -21,6 +21,7 @@ const LABELS: Record<PostMeetingTaskKind, string> = {
   oneDrive: "OneDrive",
   doc: "Doc",
   slides: "Slides",
+  twenty: "Twenty",
 };
 
 const ORDER: PostMeetingTaskKind[] = [
@@ -29,6 +30,7 @@ const ORDER: PostMeetingTaskKind[] = [
   "trello",
   "asana",
   "notion",
+  "twenty",
   "googleDrive",
   "oneDrive",
   "doc",

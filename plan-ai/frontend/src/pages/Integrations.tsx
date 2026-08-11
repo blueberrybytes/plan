@@ -28,6 +28,7 @@ import BusinessIcon from "@mui/icons-material/Business";
 import PersonIcon from "@mui/icons-material/Person";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import CodeIcon from "@mui/icons-material/Code";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 
 import githubSvg from "../icons/github.svg";
 import notionSvg from "../icons/notion.svg";
@@ -85,6 +86,7 @@ import {
   useLazyGetTrelloAuthorizationUrlQuery,
   useAutoConnectTrelloMutation,
 } from "../store/apis/trelloApi";
+import { useConnectTwentyManuallyMutation } from "../store/apis/twentyApi";
 import {
   useLazyGetNotionAuthUrlQuery,
   useGetNotionSummaryQuery,
@@ -115,6 +117,7 @@ type ProviderTabValue =
   | "jira"
   | "linear"
   | "trello"
+  | "twenty"
   | "github"
   | "google"
   | "notion"
@@ -176,6 +179,16 @@ const PROVIDER_CONFIGS: ProviderConfig[] = [
     connectCtaKey: "integrationsPage.providers.asana.connectCta",
     comingSoon: false,
     notConnectedKey: "integrationsPage.providers.asana.notConnected",
+    isWorkspaceLevel: true,
+  },
+  {
+    tabValue: "twenty",
+    provider: "TWENTY",
+    labelKey: "integrationsPage.providers.twenty.label",
+    descriptionKey: "integrationsPage.providers.twenty.description",
+    connectCtaKey: "integrationsPage.providers.twenty.connectCta",
+    comingSoon: false,
+    notConnectedKey: "integrationsPage.providers.twenty.notConnected",
     isWorkspaceLevel: true,
   },
   {
@@ -290,6 +303,15 @@ const Integrations: React.FC = () => {
   const [asanaPat, setAsanaPat] = useState("");
   const [connectAsanaManually, { isLoading: isAsanaManualConnecting }] =
     useConnectAsanaManuallyMutation();
+
+  // Twenty is self-hosted per customer, so — unlike every other provider on
+  // this page — connecting it always means "manual": there is no global OAuth
+  // app to authorize against, only this workspace's instance URL + API key.
+  const [twentyBaseUrl, setTwentyBaseUrl] = useState("");
+  const [twentyApiKey, setTwentyApiKey] = useState("");
+  const [twentyAuthError, setTwentyAuthError] = useState<string | null>(null);
+  const [connectTwentyManually, { isLoading: isTwentyManualConnecting }] =
+    useConnectTwentyManuallyMutation();
 
   const [trelloApiKey, setTrelloApiKey] = useState("");
   const [trelloApiToken, setTrelloApiToken] = useState("");
@@ -562,6 +584,31 @@ const Integrations: React.FC = () => {
       console.error("Failed to connect to Trello manually", err);
       const rtkError = err as { data?: { message?: string } };
       setTrelloAuthError(rtkError?.data?.message || t("integrationsPage.statusAlert.error"));
+    }
+  };
+
+  const handleManualTwentyConnect = async () => {
+    setTwentyAuthError(null);
+    try {
+      await connectTwentyManually({
+        baseUrl: twentyBaseUrl,
+        apiKey: twentyApiKey,
+      }).unwrap();
+
+      dispatch(
+        setToastMessage({
+          severity: "success",
+          message: t("integrationsPage.statusAlert.success"),
+        }),
+      );
+      refetchIntegrations();
+
+      setTwentyBaseUrl("");
+      setTwentyApiKey("");
+    } catch (err: unknown) {
+      console.error("Failed to connect to Twenty manually", err);
+      const rtkError = err as { data?: { message?: string } };
+      setTwentyAuthError(rtkError?.data?.message || t("integrationsPage.statusAlert.error"));
     }
   };
 
@@ -928,6 +975,57 @@ const Integrations: React.FC = () => {
                   </Box>
                 </Box>
               )}
+              {config.tabValue === "twenty" && (
+                <Box
+                  sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 3, maxWidth: 500 }}
+                >
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      {t("integrationsPage.providers.twenty.connectHeading")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {t("integrationsPage.providers.twenty.connectHelp")}
+                    </Typography>
+                    <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <TextField
+                        size="small"
+                        label={t("integrationsPage.providers.twenty.baseUrlLabel")}
+                        placeholder="https://crm.tuempresa.com"
+                        value={twentyBaseUrl}
+                        onChange={(e) => setTwentyBaseUrl(e.target.value)}
+                        required
+                      />
+                      <TextField
+                        size="small"
+                        label={t("integrationsPage.providers.twenty.apiKeyLabel")}
+                        value={twentyApiKey}
+                        onChange={(e) => setTwentyApiKey(e.target.value)}
+                        required
+                      />
+                      <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                        <Button
+                          variant="outlined"
+                          onClick={handleManualTwentyConnect}
+                          disabled={
+                            isTwentyManualConnecting ||
+                            !twentyBaseUrl.trim() ||
+                            !twentyApiKey.trim()
+                          }
+                        >
+                          {isTwentyManualConnecting
+                            ? t("integrationsPage.loading")
+                            : t("integrationsPage.providers.twenty.connectCta")}
+                        </Button>
+                      </Stack>
+                      {twentyAuthError && (
+                        <Typography variant="body2" color="error">
+                          {twentyAuthError}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+              )}
               {config.tabValue === "github" && (
                 <Button variant="contained" color="primary" onClick={handleConnectGithub}>
                   {config.connectCtaKey ? t(config.connectCtaKey) : undefined}
@@ -1124,6 +1222,9 @@ const Integrations: React.FC = () => {
                   break;
                 case "trello":
                   iconEl = <img src={trelloSvg} alt="Trello" width={16} height={16} />;
+                  break;
+                case "twenty":
+                  iconEl = <HubOutlinedIcon sx={{ fontSize: 16 }} />;
                   break;
                 case "google":
                   iconEl = <img src={googleDriveSvg} alt="Google Drive" width={16} height={16} />;

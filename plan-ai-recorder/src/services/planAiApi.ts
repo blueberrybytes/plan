@@ -309,6 +309,13 @@ export const createPlanAiApi = (
       sysFile?: Blob;
       /** Stop-time echo-canceller outcome (see audioRecorder AecTelemetry). */
       aecTelemetry?: object;
+      /**
+       * Real wall-clock instant capture began (ISO 8601), and elapsed capture
+       * seconds. `recordedAt` above is upload time — the backend needs this pair
+       * to tell whether two teammates' recordings of the same meeting overlap.
+       */
+      recordingStartedAt?: string;
+      recordingWallClockSeconds?: number;
       skipAi?: boolean;
       exportToGoogleDrive?: boolean;
       exportToOneDrive?: boolean;
@@ -351,6 +358,12 @@ export const createPlanAiApi = (
         }
         if (payload.aecTelemetry) {
           formData.append("aecTelemetry", JSON.stringify(payload.aecTelemetry));
+        }
+        if (payload.recordingStartedAt) {
+          formData.append("recordingStartedAt", payload.recordingStartedAt);
+        }
+        if (payload.recordingWallClockSeconds) {
+          formData.append("recordingWallClockSeconds", payload.recordingWallClockSeconds.toString());
         }
 
         // Determine mime types based on platform or defaults. The mic may be an

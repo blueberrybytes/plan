@@ -141,6 +141,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/twenty/manual-connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ManualConnect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/twenty/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/twenty/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/twenty/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchPeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/twenty/push-transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Push a meeting into Twenty as a note linked to the company (and people).
+         *     Deduplicated server-side: if a teammate already pushed the same meeting,
+         *     this returns their note instead of creating a second one.
+         */
+        post: operations["PushTranscript"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/trello/manual-connect": {
         parameters: {
             query?: never;
@@ -2682,6 +2767,71 @@ export interface components {
             /** Format: double */
             status: number;
         };
+        TwentyManualConnectRequest: {
+            /** @description Root of the Twenty instance, e.g. "https://crm.acme.com". */
+            baseUrl: string;
+            apiKey: string;
+        };
+        TwentySummaryResponse: {
+            connected: boolean;
+            baseUrl?: string;
+            workspaceName?: string;
+        };
+        ApiResponse_TwentySummaryResponse_: {
+            message?: string;
+            data: components["schemas"]["TwentySummaryResponse"] | null;
+            /** Format: double */
+            status: number;
+        };
+        TwentyCompanyItem: {
+            id: string;
+            name: string;
+            domainName?: string;
+        };
+        "ApiResponse_TwentyCompanyItem-Array_": {
+            message?: string;
+            data: components["schemas"]["TwentyCompanyItem"][] | null;
+            /** Format: double */
+            status: number;
+        };
+        TwentyPersonItem: {
+            id: string;
+            name: string;
+            email?: string;
+            companyId?: string;
+        };
+        "ApiResponse_TwentyPersonItem-Array_": {
+            message?: string;
+            data: components["schemas"]["TwentyPersonItem"][] | null;
+            /** Format: double */
+            status: number;
+        };
+        /** @enum {string} */
+        TwentyPushOutcome: "CREATED" | "ALREADY_PUSHED" | "DEDUPED";
+        PushTranscriptToTwentyResponse: {
+            outcome: components["schemas"]["TwentyPushOutcome"];
+            noteId: string;
+            url?: string;
+            /** @description Present when outcome is DEDUPED — the recording that won. */
+            canonicalTranscriptId?: string;
+        };
+        "ApiResponse_PushTranscriptToTwentyResponse-or-null_": {
+            message?: string;
+            data: components["schemas"]["PushTranscriptToTwentyResponse"] | null;
+            /** Format: double */
+            status: number;
+        };
+        PushTranscriptToTwentyRequest: {
+            transcriptId: string;
+            companyId: string;
+            personIds?: string[];
+            opportunityId?: string;
+            /**
+             * @description Set by the UI when the user rejects an automatic "same meeting" match and
+             *     insists this really is a separate meeting deserving its own note.
+             */
+            forceSeparateNote?: boolean;
+        };
         TrelloManualConnectRequest: {
             apiKey: string;
             token: string;
@@ -3199,8 +3349,45 @@ export interface components {
             oneDrive?: components["schemas"]["PostMeetingTaskStatus"];
             doc?: components["schemas"]["PostMeetingTaskStatus"];
             slides?: components["schemas"]["PostMeetingTaskStatus"];
+            twenty?: components["schemas"]["PostMeetingTaskStatus"];
         };
         PostMeetingTasksRecord: components["schemas"]["Partial_Record_PostMeetingTaskKind.PostMeetingTaskStatus__"];
+        /**
+         * @description Where this transcript ended up in Twenty.
+         *
+         *     `CANONICAL` — this recording's content became the CRM note.
+         *     `SECONDARY` — a teammate recorded the same meeting and their note won; we
+         *     deliberately did NOT create a second note in the client's CRM, and point at
+         *     theirs instead. The user can override this from the UI if the overlap test
+         *     got it wrong (two genuinely different meetings with the same company).
+         */
+        TwentyNoteRef: {
+            noteId: string;
+            url?: string;
+            /** @enum {string} */
+            role: "CANONICAL" | "SECONDARY";
+            /** @description Set when role is SECONDARY: the transcript that actually produced the note. */
+            canonicalTranscriptId?: string;
+            syncedAt?: string;
+        };
+        /**
+         * @description Capture window as measured by the recording client.
+         *
+         *     `Transcript.recordedAt` is the UPLOAD time and `durationSeconds` is derived
+         *     from the last utterance — neither is the true meeting start. Two teammates
+         *     recording the same call upload at different moments, so comparing those
+         *     fields alone is unreliable. When the client reports these, overlap detection
+         *     uses them instead.
+         */
+        RecordingWindow: {
+            /** @description ISO-8601 UTC instant capture actually started. */
+            startedAt: string;
+            /**
+             * Format: double
+             * @description Wall-clock seconds from start to stop (includes pauses, unlike durationSeconds).
+             */
+            wallClockSeconds?: number;
+        };
         TranscriptMetadata: {
             /** @enum {string} */
             processingStatus?: "PENDING" | "PROCESSING" | "EXTRACTING_TASKS" | "REFINING_TASKS" | "COMPLETED" | "FAILED" | "DONE";
@@ -3227,6 +3414,10 @@ export interface components {
             speakerNameOverrides?: components["schemas"]["Record_string.string_"];
             /** @description Per-step status of fire-and-forget effects kicked off after a transcript is processed */
             postMeetingTasks?: components["schemas"]["PostMeetingTasksRecord"];
+            /** @description Result of pushing this meeting to Twenty CRM. */
+            twenty?: components["schemas"]["TwentyNoteRef"];
+            /** @description Real capture window reported by the client, when it sent one. */
+            recording?: components["schemas"]["RecordingWindow"];
         };
         TranscriptContextSummary: {
             id: string;
@@ -3356,7 +3547,7 @@ export interface components {
             status: number;
         };
         /** @enum {string} */
-        PostMeetingTaskKind: "jira" | "linear" | "trello" | "notion" | "asana" | "googleDrive" | "oneDrive" | "doc" | "slides";
+        PostMeetingTaskKind: "jira" | "linear" | "trello" | "notion" | "asana" | "googleDrive" | "oneDrive" | "doc" | "slides" | "twenty";
         /**
          * @description Work-category tag set by the AI ticket extractor. Lets the frontend split
          *     engineering work from support / design / ops / research items so the
@@ -3798,7 +3989,7 @@ export interface components {
             projectId: string;
         };
         /** @enum {string} */
-        "_36_Enums.IntegrationProvider": "JIRA" | "LINEAR" | "GITHUB" | "GOOGLE_DRIVE" | "TRELLO" | "NOTION" | "ONEDRIVE" | "ASANA";
+        "_36_Enums.IntegrationProvider": "JIRA" | "LINEAR" | "GITHUB" | "GOOGLE_DRIVE" | "TRELLO" | "NOTION" | "ONEDRIVE" | "ASANA" | "TWENTY";
         IntegrationProvider: components["schemas"]["_36_Enums.IntegrationProvider"];
         /** @enum {string} */
         "_36_Enums.IntegrationStatus": "CONNECTED" | "DISCONNECTED" | "ERROR";
@@ -5017,6 +5208,145 @@ export interface operations {
         };
         requestBody: {
             content: {
+                "application/json": components["schemas"]["TwentyManualConnectRequest"];
+            };
+        };
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_null_"];
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_null_"];
+                };
+            };
+        };
+    };
+    GetSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_TwentySummaryResponse_"];
+                };
+            };
+        };
+    };
+    SearchCompanies: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_TwentyCompanyItem-Array_"];
+                };
+            };
+        };
+    };
+    SearchPeople: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_TwentyPersonItem-Array_"];
+                };
+            };
+        };
+    };
+    PushTranscript: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTranscriptToTwentyRequest"];
+            };
+        };
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_PushTranscriptToTwentyResponse-or-null_"];
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_null_"];
+                };
+            };
+            /** @description Transcript not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_null_"];
+                };
+            };
+        };
+    };
+    ManualConnect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
                 "application/json": components["schemas"]["TrelloManualConnectRequest"];
             };
         };
@@ -6010,6 +6340,8 @@ export interface operations {
                     createSlides?: string;
                     language?: string;
                     aecTelemetry?: string;
+                    recordingStartedAt?: string;
+                    recordingWallClockSeconds?: string;
                     /** Format: binary */
                     micFile?: string;
                     /** Format: binary */

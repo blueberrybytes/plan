@@ -350,6 +350,8 @@ export class TranscriptsController extends BaseWorkspaceController {
     @FormField() createSlides?: string,
     @FormField() language?: string,
     @FormField() aecTelemetry?: string,
+    @FormField() recordingStartedAt?: string,
+    @FormField() recordingWallClockSeconds?: string,
     @UploadedFile("micFile") micFile?: Express.Multer.File,
     @UploadedFile("sysFile") sysFile?: Express.Multer.File,
   ): Promise<ApiResponse<StandaloneTranscriptResponse>> {
@@ -379,6 +381,26 @@ export class TranscriptsController extends BaseWorkspaceController {
     // records per-recording whether the uploaded mic was cleaned, skipped
     // (cap/headphones) or rejected — the key diagnostic for echoey meetings.
     // Diagnostics must never block an upload, so parse failures are ignored.
+    // Real capture window, when the recorder reports it. `recordedAt` above is
+    // UPLOAD time, unusable for telling apart two teammates' recordings of the
+    // same meeting (see twentyIntegrationService's overlap test) — this is the
+    // actual instant the mic/system capture began. Never blocks the upload.
+    let recordingWindow: Prisma.JsonObject | undefined;
+    if (recordingStartedAt) {
+      const startedAtDate = new Date(recordingStartedAt);
+      if (!Number.isNaN(startedAtDate.getTime())) {
+        const wallClockSeconds = recordingWallClockSeconds
+          ? Number.parseInt(recordingWallClockSeconds, 10)
+          : undefined;
+        recordingWindow = {
+          startedAt: startedAtDate.toISOString(),
+          ...(wallClockSeconds && Number.isFinite(wallClockSeconds) && wallClockSeconds > 0
+            ? { wallClockSeconds }
+            : {}),
+        };
+      }
+    }
+
     let recorderAec: Prisma.JsonObject | undefined;
     if (aecTelemetry && aecTelemetry.length <= 2048) {
       try {
@@ -396,6 +418,17 @@ export class TranscriptsController extends BaseWorkspaceController {
     // RAG queries, and downstream chat see the project's files.
     if (contextIdsArray.length === 0 && projectId) {
       contextIdsArray = await resolveProjectIdsToContextIds([projectId]);
+    }
+
+    // Validate the target project BEFORE touching storage. This used to run
+    // after the upload, so a rejected project left orphaned blobs in Firebase
+    // AND lost the recording the user had just finished — the worst possible
+    // failure for a meeting recorder.
+    if (projectId) {
+      const project = await prisma.project.findUnique({
+        where: { id: projectId, userId: user.id, workspaceId },
+      });
+      if (!project) throw { status: 404, message: "Project not found or unauthorized." };
     }
 
     // Optional Firebase Upload logic inline (if files exist)
@@ -447,13 +480,6 @@ export class TranscriptsController extends BaseWorkspaceController {
 
     const contextPrompt = await this.buildContextPrompt(user.id, contextIdsArray);
 
-    if (projectId) {
-      const project = await prisma.project.findUnique({
-        where: { id: projectId, userId: user.id, workspaceId },
-      });
-      if (!project) throw { status: 404, message: "Project not found or unauthorized." };
-    }
-
     const generationOptions = {
       contextIds: contextIdsArray,
       persona: undefined,
@@ -494,6 +520,7 @@ export class TranscriptsController extends BaseWorkspaceController {
           ...(locationObj ? { location: locationObj } : {}),
           ...(recordingLanguage ? { recordingLanguage } : {}),
           ...(recorderAec ? { recorderAec } : {}),
+          ...(recordingWindow ? { recording: recordingWindow } : {}),
           generationOptions,
         } as Prisma.JsonObject,
       },
