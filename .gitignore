@@ -40,3 +40,6 @@ credentials.json
 *.mobileprovision
 *.keystore
 sales
+
+PLAN.md
+VENTAS.md
