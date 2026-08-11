@@ -20,6 +20,9 @@ export interface TranscriptGenerationJobPayload {
   syncToTrello?: boolean;
   syncToNotion?: boolean;
   syncToAsana?: boolean;
+  syncToTwenty?: boolean;
+  /** Chosen per meeting — the same person meets different clients. */
+  twentyCompanyId?: string;
   exportToGoogleDrive?: boolean;
   exportToOneDrive?: boolean;
   contextPrompt?: string;

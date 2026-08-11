@@ -3197,7 +3197,7 @@ ${taskSummaries}`,
    *
    * Neither available → SKIPPED, not FAILED: it's a missing choice, not an error.
    */
-  private async autoPushToTwenty(
+  public async autoPushToTwenty(
     workspaceId: string,
     transcript: Transcript,
     explicitCompanyId?: string,

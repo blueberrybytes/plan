@@ -547,6 +547,15 @@ export class TranscriptsController extends BaseWorkspaceController {
         source: source ?? TranscriptSource.RECORDING,
         ...generationOptions,
       });
+    } else if (generationOptions.syncToTwenty) {
+      // "Save transcript only" skips the AI worker entirely — but a CRM note
+      // needs no AI, and the user ticked the box. Without this the checkbox
+      // silently did nothing on that path.
+      void projectTranscriptService
+        .autoPushToTwenty(workspaceId, transcript, generationOptions.twentyCompanyId)
+        .catch((err) => {
+          logger.error(`Failed to push transcript ${transcript.id} to Twenty (skipAi path)`, err);
+        });
     }
 
     if (chatHistoryArray.length > 0) {

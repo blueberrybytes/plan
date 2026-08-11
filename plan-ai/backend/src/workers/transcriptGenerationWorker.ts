@@ -59,29 +59,16 @@ export const transcriptGenerationWorker = new Worker<TranscriptGenerationJobPayl
       }
 
       try {
-        await projectTranscriptService.processPendingTranscript(job.data.transcriptId, {
-          projectId: job.data.projectId || "",
-          workspaceId: job.data.workspaceId,
-          userId: job.data.userId,
-          content: job.data.content,
-          source: job.data.source,
-          contextIds: job.data.contextIds,
-          persona: job.data.persona,
-          objective: job.data.objective,
-          complexityLevel: job.data.complexityLevel,
-          modelKey: job.data.modelKey,
-          syncToJira: job.data.syncToJira,
-          syncToLinear: job.data.syncToLinear,
-          syncToTrello: job.data.syncToTrello,
-          syncToNotion: job.data.syncToNotion,
-          syncToAsana: job.data.syncToAsana,
-          exportToGoogleDrive: job.data.exportToGoogleDrive,
-          exportToOneDrive: job.data.exportToOneDrive,
-          taskStrategy: job.data.taskStrategy,
-          taskCount: job.data.taskCount,
-          contextPrompt: job.data.contextPrompt,
-          createDoc: job.data.createDoc,
-          createSlides: job.data.createSlides,
+        // Forward the payload wholesale. This used to be a field-by-field copy,
+        // which silently dropped every option added to the payload afterwards
+        // (syncToTwenty and agenticInvestigation both went missing that way —
+        // no error, just a setting the user chose that never took effect).
+        // Spreading makes new options work by construction, and the compiler
+        // now flags any payload field the pipeline can't accept.
+        const { transcriptId, projectId, ...jobOptions } = job.data;
+        await projectTranscriptService.processPendingTranscript(transcriptId, {
+          ...jobOptions,
+          projectId: projectId || "",
         });
 
         logger.info(`Successfully completed TranscriptGenerationJob ${job.id}`);
@@ -114,6 +101,7 @@ export const transcriptGenerationWorker = new Worker<TranscriptGenerationJobPayl
           if (job.data.syncToTrello) tasks.trello = failedStatus;
           if (job.data.syncToNotion) tasks.notion = failedStatus;
           if (job.data.syncToAsana) tasks.asana = failedStatus;
+          if (job.data.syncToTwenty) tasks.twenty = failedStatus;
           if (job.data.createDoc) tasks.doc = failedStatus;
           if (job.data.createSlides) tasks.slides = failedStatus;
           if (job.data.exportToGoogleDrive) tasks.googleDrive = failedStatus;
