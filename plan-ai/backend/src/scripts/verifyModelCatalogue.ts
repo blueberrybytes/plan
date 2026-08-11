@@ -66,14 +66,18 @@ const main = async (): Promise<void> => {
     if (providers === 0) issues.push("no live provider");
     if (model && !hasSchema) issues.push("no structured_outputs — breaks Output.object()");
     if (model && declared > real) {
-      issues.push(`declares ${declared.toLocaleString()} context, real is ${real.toLocaleString()}`);
+      issues.push(
+        `declares ${declared.toLocaleString()} context, real is ${real.toLocaleString()}`,
+      );
     }
 
     const price = model
       ? `${perMillion(model.pricing?.prompt)}/${perMillion(model.pricing?.completion)}`
       : "—";
     const status = issues.length ? `✖ ${issues.join(" · ")}` : "ok";
-    console.log(`${id.padEnd(38)} ${price.padStart(18)} ${String(providers).padStart(3)} prov  ${status}`);
+    console.log(
+      `${id.padEnd(38)} ${price.padStart(18)} ${String(providers).padStart(3)} prov  ${status}`,
+    );
 
     if (issues.length) problems.push(`${id}: ${issues.join("; ")}`);
 

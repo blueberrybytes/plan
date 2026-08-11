@@ -115,7 +115,9 @@ describe("recordMeetingOnTimeline", () => {
       const json = (payload: unknown) =>
         ({ ok: true, status: 200, json: async () => payload, text: async () => "" }) as Response;
       if (String(url).endsWith("/metadata")) {
-        return json({ data: { objects: { edges: [{ node: { id: "obj-note", nameSingular: "note" } }] } } });
+        return json({
+          data: { objects: { edges: [{ node: { id: "obj-note", nameSingular: "note" } }] } },
+        });
       }
       return json({ data: {} });
     }) as unknown as typeof fetch;
