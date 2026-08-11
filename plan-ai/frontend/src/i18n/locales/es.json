@@ -1426,5 +1426,20 @@
   },
   "prototype": {
     "notFound": "Este prototipo ya no está disponible."
+  },
+  "twenty": {
+    "link": {
+      "title": "Twenty CRM",
+      "linkedGeneric": "Vinculado",
+      "subtitleLinked": "Las reuniones grabadas en este proyecto se pueden enviar a esta empresa automáticamente.",
+      "subtitleEmpty": "Elige la empresa de Twenty a la que pertenece este proyecto. Hasta entonces, el recorder no puede archivar sus actas.",
+      "search": "Buscar empresas en Twenty…",
+      "typeToSearch": "Escribe al menos 2 caracteres…",
+      "noResults": "No se encontraron empresas",
+      "unlink": "Desvincular",
+      "linked": "Proyecto vinculado a {{name}} en Twenty.",
+      "unlinked": "Proyecto desvinculado de Twenty.",
+      "error": "No se pudo actualizar el vínculo con Twenty."
+    }
   }
 }

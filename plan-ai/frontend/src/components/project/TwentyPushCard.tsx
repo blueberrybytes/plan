@@ -138,7 +138,11 @@ export const TwentyPushCard: React.FC<Props> = ({ transcriptId, speakers, twenty
   const resolved: { isSecondary: boolean; noteId: string; url?: string } | null = result
     ? { isSecondary: result.outcome === "DEDUPED", noteId: result.noteId, url: result.url }
     : twentyRef
-      ? { isSecondary: twentyRef.role === "SECONDARY", noteId: twentyRef.noteId, url: twentyRef.url }
+      ? {
+          isSecondary: twentyRef.role === "SECONDARY",
+          noteId: twentyRef.noteId,
+          url: twentyRef.url,
+        }
       : null;
 
   if (resolved?.isSecondary) {

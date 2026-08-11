@@ -23,6 +23,28 @@ export interface TwentyPersonItem {
   companyId?: string;
 }
 
+/**
+ * Links a Plan AI project to a company in Twenty.
+ *
+ * This is what makes an unattended push possible. Every other integration can
+ * work from a single workspace-wide default (a Jira project, a Trello board),
+ * but a CRM note has to land on a DIFFERENT company per meeting — so the
+ * destination is resolved per project, once, and every meeting recorded into
+ * that project inherits it.
+ */
+export interface LinkProjectToTwentyCompanyRequest {
+  projectId: string;
+  /** Null unlinks the project (auto-push stops; manual push still works). */
+  companyId: string | null;
+  companyName?: string | null;
+}
+
+export interface ProjectTwentyLink {
+  projectId: string;
+  companyId: string | null;
+  companyName: string | null;
+}
+
 export interface PushTranscriptToTwentyRequest {
   transcriptId: string;
   companyId: string;

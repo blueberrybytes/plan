@@ -98,7 +98,10 @@ const MeetingsChatDrawer: React.FC<MeetingsChatDrawerProps> = ({
       try {
         const response = await sendLiveChatMessage({
           content: question,
-          liveTranscript: buildMeetingsContext(meetings, t("meetings.untitled", "Untitled meeting")),
+          liveTranscript: buildMeetingsContext(
+            meetings,
+            t("meetings.untitled", "Untitled meeting"),
+          ),
           projectIds: [projectId],
           history,
         }).unwrap();

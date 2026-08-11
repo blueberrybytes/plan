@@ -44,7 +44,7 @@ import {
 } from "../utils/unsavedTranscript";
 import ReactMarkdown from "react-markdown";
 import { DEEPGRAM_LANGUAGES, AUTO_LANGUAGE_OPTION } from "../utils/deepgramLanguages";
-import type { Context, Project, AiModel, UserIntegrationSummary } from "../services/planAiApi";
+import type { Context, Project, AiModel, UserIntegrationSummary, TwentyCompanyItem } from "../services/planAiApi";
 
 type Phase = "recording" | "context_selection" | "saving" | "done" | "error";
 
@@ -320,11 +320,50 @@ const Recording: React.FC = () => {
   const [complexityLevel, setComplexityLevel] = useState<string>("");
 
   const [integrations, setIntegrations] = useState<UserIntegrationSummary[]>([]);
+
+  // ── Twenty CRM destination ────────────────────────────────────────────────
+  // The company is chosen PER RECORDING: one person meets several different
+  // clients in a day, and most recordings don't even have a project yet (the
+  // picker defaults to "Create new project for me"). The project's linked
+  // company, when there is one, only pre-fills the field.
+  const hasTwenty = integrations.some((i) => i.provider === "TWENTY" && i.status === "CONNECTED");
+  const [twentyCompany, setTwentyCompany] = useState<TwentyCompanyItem | null>(null);
+  const [twentyCompanies, setTwentyCompanies] = useState<TwentyCompanyItem[]>([]);
+  const [twentyQuery, setTwentyQuery] = useState("");
+  const [isSearchingCompanies, setIsSearchingCompanies] = useState(false);
+
+  // Pre-fill from the project's link (convenience for recurring clients).
+  useEffect(() => {
+    if (twentyCompany) return;
+    const project = projects.find((p) => p.id === selectedProjectId);
+    const meta =
+      (project?.metadata as { twentyCompanyId?: string; twentyCompanyName?: string } | null) ??
+      null;
+    if (meta?.twentyCompanyId) {
+      setTwentyCompany({ id: meta.twentyCompanyId, name: meta.twentyCompanyName ?? "Linked company" });
+    }
+  }, [projects, selectedProjectId, twentyCompany]);
+
+  // Debounced search — the CRM is a self-hosted instance, don't hammer it.
+  useEffect(() => {
+    if (!hasTwenty || twentyQuery.trim().length < 2) return;
+    const handle = setTimeout(() => {
+      setIsSearchingCompanies(true);
+      api
+        .searchTwentyCompanies(twentyQuery.trim())
+        .then(setTwentyCompanies)
+        .catch(() => setTwentyCompanies([]))
+        .finally(() => setIsSearchingCompanies(false));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [twentyQuery, hasTwenty, api]);
+
   const [syncToJira, setSyncToJira] = useState<boolean>(false);
   const [syncToLinear, setSyncToLinear] = useState<boolean>(false);
   const [syncToTrello, setSyncToTrello] = useState<boolean>(false);
   const [syncToNotion, setSyncToNotion] = useState<boolean>(false);
   const [syncToAsana, setSyncToAsana] = useState<boolean>(false);
+  const [syncToTwenty, setSyncToTwenty] = useState<boolean>(false);
   const [exportToGoogleDrive, setExportToGoogleDrive] = useState<boolean>(false);
   const [exportToOneDrive, setExportToOneDrive] = useState<boolean>(false);
   const [taskStrategy, setTaskStrategy] = useState<"AUTO" | "SINGLE_TICKET" | "SPECIFIC_COUNT">("AUTO");
@@ -765,6 +804,8 @@ const Recording: React.FC = () => {
         syncToTrello,
         syncToNotion,
         syncToAsana,
+        syncToTwenty: syncToTwenty && Boolean(twentyCompany),
+        twentyCompanyId: twentyCompany?.id,
         exportToGoogleDrive,
         exportToOneDrive,
         taskStrategy,
@@ -804,6 +845,8 @@ const Recording: React.FC = () => {
     syncToTrello,
     syncToNotion,
     syncToAsana,
+    syncToTwenty,
+    twentyCompany,
     exportToGoogleDrive,
     exportToOneDrive,
     taskStrategy,
@@ -1140,6 +1183,55 @@ const Recording: React.FC = () => {
                   control={<Checkbox size="small" checked={syncToAsana} onChange={(e) => setSyncToAsana(e.target.checked)} />}
                   label={<Typography variant="body2">Asana</Typography>}
                 />
+              )}
+              {hasTwenty && (
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={syncToTwenty}
+                        onChange={(e) => setSyncToTwenty(e.target.checked)}
+                      />
+                    }
+                    label={<Typography variant="body2">Twenty CRM</Typography>}
+                  />
+                  {/* The company is picked PER MEETING: the same person sees
+                      several different clients in a day. The project's linked
+                      company (if any) just pre-fills this. */}
+                  {syncToTwenty && (
+                    <Autocomplete
+                      size="small"
+                      sx={{ mt: 1 }}
+                      options={twentyCompanies}
+                      value={twentyCompany}
+                      loading={isSearchingCompanies}
+                      getOptionLabel={(o) => o.name}
+                      isOptionEqualToValue={(a, b) => a.id === b.id}
+                      filterOptions={(x) => x}
+                      onInputChange={(_, v) => setTwentyQuery(v)}
+                      onChange={(_, v) => setTwentyCompany(v)}
+                      noOptionsText={
+                        twentyQuery.trim().length < 2
+                          ? 'Type at least 2 characters…'
+                          : 'No companies found'
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Company in Twenty"
+                          placeholder="Search…"
+                          error={syncToTwenty && !twentyCompany}
+                          helperText={
+                            syncToTwenty && !twentyCompany
+                              ? 'Pick a company or the note will be skipped'
+                              : ' '
+                          }
+                        />
+                      )}
+                    />
+                  )}
+                </Box>
               )}
               {integrations.find((i) => i.provider === "GOOGLE_DRIVE" && i.status === "CONNECTED") && (
                 <FormControlLabel

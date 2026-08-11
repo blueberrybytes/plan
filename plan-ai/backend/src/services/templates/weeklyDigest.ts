@@ -4,16 +4,10 @@ const APP_URL = process.env.APP_URL || "https://plan-ai.blueberrybytes.com";
 
 /** Escape user-controlled strings — meeting titles land straight in the HTML. */
 const esc = (value: string): string =>
-  value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const fmtDate = (d: Date | null): string =>
-  d
-    ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-    : "—";
+  d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—";
 
 export interface WeeklyDigestEmailInput {
   userName: string | null;

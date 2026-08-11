@@ -226,6 +226,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/twenty/link-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Links a project to a Twenty company so meetings recorded into it can be
+         *     pushed unattended (the "Send to Twenty" toggle in the recorder / mobile).
+         */
+        post: operations["LinkProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/trello/manual-connect": {
         parameters: {
             query?: never;
@@ -2832,6 +2852,32 @@ export interface components {
              */
             forceSeparateNote?: boolean;
         };
+        ProjectTwentyLink: {
+            projectId: string;
+            companyId: string | null;
+            companyName: string | null;
+        };
+        "ApiResponse_ProjectTwentyLink-or-null_": {
+            message?: string;
+            data: components["schemas"]["ProjectTwentyLink"] | null;
+            /** Format: double */
+            status: number;
+        };
+        /**
+         * @description Links a Plan AI project to a company in Twenty.
+         *
+         *     This is what makes an unattended push possible. Every other integration can
+         *     work from a single workspace-wide default (a Jira project, a Trello board),
+         *     but a CRM note has to land on a DIFFERENT company per meeting — so the
+         *     destination is resolved per project, once, and every meeting recorded into
+         *     that project inherits it.
+         */
+        LinkProjectToTwentyCompanyRequest: {
+            projectId: string;
+            /** @description Null unlinks the project (auto-push stops; manual push still works). */
+            companyId: string | null;
+            companyName?: string | null;
+        };
         TrelloManualConnectRequest: {
             apiKey: string;
             token: string;
@@ -3514,6 +3560,8 @@ export interface components {
             syncToTrello?: boolean;
             syncToNotion?: boolean;
             syncToAsana?: boolean;
+            syncToTwenty?: boolean;
+            twentyCompanyId?: string;
             exportToGoogleDrive?: boolean;
             exportToOneDrive?: boolean;
             /** @enum {string} */
@@ -5338,6 +5386,39 @@ export interface operations {
             };
         };
     };
+    LinkProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkProjectToTwentyCompanyRequest"];
+            };
+        };
+        responses: {
+            /** @description Ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_ProjectTwentyLink-or-null_"];
+                };
+            };
+            /** @description Project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_null_"];
+                };
+            };
+        };
+    };
     ManualConnect: {
         parameters: {
             query?: never;
@@ -6330,6 +6411,8 @@ export interface operations {
                     syncToTrello?: string;
                     syncToNotion?: string;
                     syncToAsana?: string;
+                    syncToTwenty?: string;
+                    twentyCompanyId?: string;
                     exportToGoogleDrive?: string;
                     exportToOneDrive?: string;
                     skipAi?: string;

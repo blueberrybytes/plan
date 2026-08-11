@@ -1,6 +1,6 @@
 {
   "name": "plan-ai",
-  "version": "4.3.2",
+  "version": "4.3.3",
   "description": "Plan AI - AI-assisted meeting planning & execution platform by Blueberrybytes",
   "main": "index.js",
   "engines": {

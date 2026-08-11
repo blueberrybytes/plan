@@ -136,16 +136,16 @@ describe("resolveMeetingInterval", () => {
   });
 
   it("returns null when there is no usable timing", () => {
-    expect(resolveMeetingInterval(transcript({ recordedAt: null, durationSeconds: null }))).toBeNull();
+    expect(
+      resolveMeetingInterval(transcript({ recordedAt: null, durationSeconds: null })),
+    ).toBeNull();
   });
 });
 
 describe("pushMeetingNote", () => {
   const okFetch = (noteId = "note-1") => {
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      const body = url.includes("/notes")
-        ? { data: { createNote: { id: noteId } } }
-        : { data: {} };
+      const body = url.includes("/notes") ? { data: { createNote: { id: noteId } } } : { data: {} };
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
     });
   };
@@ -289,7 +289,11 @@ describe("pushMeetingNote", () => {
   it("throws instead of reporting success when every link fails", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes("/noteTargets")) {
-        return Promise.resolve({ ok: false, status: 400, text: () => Promise.resolve("bad target") });
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve("bad target"),
+        });
       }
       return Promise.resolve({
         ok: true,

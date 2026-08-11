@@ -494,6 +494,75 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"ProjectTwentyLink": {
+				"properties": {
+					"projectId": {
+						"type": "string"
+					},
+					"companyId": {
+						"type": "string",
+						"nullable": true
+					},
+					"companyName": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"projectId",
+					"companyId",
+					"companyName"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ApiResponse_ProjectTwentyLink-or-null_": {
+				"properties": {
+					"message": {
+						"type": "string"
+					},
+					"data": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/ProjectTwentyLink"
+							}
+						],
+						"nullable": true
+					},
+					"status": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"data",
+					"status"
+				],
+				"type": "object"
+			},
+			"LinkProjectToTwentyCompanyRequest": {
+				"description": "Links a Plan AI project to a company in Twenty.\n\nThis is what makes an unattended push possible. Every other integration can\nwork from a single workspace-wide default (a Jira project, a Trello board),\nbut a CRM note has to land on a DIFFERENT company per meeting — so the\ndestination is resolved per project, once, and every meeting recorded into\nthat project inherits it.",
+				"properties": {
+					"projectId": {
+						"type": "string"
+					},
+					"companyId": {
+						"type": "string",
+						"nullable": true,
+						"description": "Null unlinks the project (auto-push stops; manual push still works)."
+					},
+					"companyName": {
+						"type": "string",
+						"nullable": true
+					}
+				},
+				"required": [
+					"projectId",
+					"companyId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"TrelloManualConnectRequest": {
 				"properties": {
 					"apiKey": {
@@ -2869,6 +2938,12 @@
 					},
 					"syncToAsana": {
 						"type": "boolean"
+					},
+					"syncToTwenty": {
+						"type": "boolean"
+					},
+					"twentyCompanyId": {
+						"type": "string"
 					},
 					"exportToGoogleDrive": {
 						"type": "boolean"
@@ -7644,7 +7719,7 @@
 	},
 	"info": {
 		"title": "backend",
-		"version": "4.3.0",
+		"version": "4.3.3",
 		"license": {
 			"name": "BUSL-1.1"
 		},
@@ -8346,6 +8421,53 @@
 						"application/json": {
 							"schema": {
 								"$ref": "#/components/schemas/PushTranscriptToTwentyRequest"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/twenty/link-project": {
+			"post": {
+				"operationId": "LinkProject",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_ProjectTwentyLink-or-null_"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Project not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ApiResponse_null_"
+								}
+							}
+						}
+					}
+				},
+				"description": "Links a project to a Twenty company so meetings recorded into it can be\npushed unattended (the \"Send to Twenty\" toggle in the recorder / mobile).",
+				"tags": [
+					"Integrations"
+				],
+				"security": [
+					{
+						"ClientLevel": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LinkProjectToTwentyCompanyRequest"
 							}
 						}
 					}
@@ -10180,6 +10302,12 @@
 										"type": "string"
 									},
 									"syncToAsana": {
+										"type": "string"
+									},
+									"syncToTwenty": {
+										"type": "string"
+									},
+									"twentyCompanyId": {
 										"type": "string"
 									},
 									"exportToGoogleDrive": {

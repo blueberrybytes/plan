@@ -72,6 +72,28 @@ import { mcpClientService } from "./mcpClientService";
 import { ladybugService } from "./ladybugService";
 import { taskRefinementQueue } from "../queue/taskRefinementQueue";
 import { generateProjectDigest } from "./projectDigestService";
+import { twentyIntegrationService } from "./twentyIntegrationService";
+
+/**
+ * Which Twenty company a meeting note is filed under.
+ *
+ * The user's per-recording choice always wins: one person meets several
+ * DIFFERENT clients in a day, and most recordings have no project yet (the
+ * recorder defaults to "create one for me"). A project's linked company is only
+ * a convenience default for recurring client work.
+ *
+ * Returns undefined when neither is available — the caller marks the step
+ * SKIPPED, not FAILED: a missing choice is not an error.
+ */
+export const resolveTwentyCompanyId = (
+  explicitCompanyId: string | undefined,
+  projectMetadata: unknown,
+): string | undefined => {
+  const explicit = explicitCompanyId?.trim();
+  if (explicit) return explicit;
+  const linked = (projectMetadata as { twentyCompanyId?: string } | null)?.twentyCompanyId;
+  return linked?.trim() || undefined;
+};
 
 const TASK_STATUS_VALUES = ["BACKLOG", "IN_PROGRESS", "BLOCKED", "COMPLETED", "ARCHIVED"] as const;
 const TASK_PRIORITY_VALUES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -334,6 +356,15 @@ export interface CreateTranscriptInput {
   syncToTrello?: boolean;
   syncToNotion?: boolean;
   syncToAsana?: boolean;
+  /** Push the meeting note to Twenty. */
+  syncToTwenty?: boolean;
+  /**
+   * Which Twenty company the note is filed under, chosen when the recording is
+   * saved. Falls back to the project's linked company when omitted — one person
+   * meets several different clients in a day, so the destination belongs to the
+   * MEETING, not to the project.
+   */
+  twentyCompanyId?: string;
   exportToGoogleDrive?: boolean;
   exportToOneDrive?: boolean;
   workspaceId: string;
@@ -1196,6 +1227,17 @@ export class ProjectTranscriptService {
       }).catch((err) => {
         logger.error(`Failed to auto-sync tasks for transcript ${result.transcript.id}`, err);
       });
+    }
+
+    // Auto-push the meeting note to Twenty. Deliberately OUTSIDE the
+    // `createdTasks.length > 0` gate above: a meeting with no extracted tasks
+    // still belongs in the client's CRM.
+    if (input.syncToTwenty) {
+      this.autoPushToTwenty(input.workspaceId, result.transcript, input.twentyCompanyId).catch(
+        (err) => {
+          logger.error(`Failed to auto-push transcript ${result.transcript.id} to Twenty`, err);
+        },
+      );
     }
 
     // Auto-Export Document to Cloud Storage
@@ -2388,6 +2430,13 @@ ${transcriptForLLM}`;
       return;
     }
 
+    if (kind === "twenty") {
+      // Routed through the same idempotent path as the automatic push, so the
+      // retry button can never become a second source of duplicate CRM notes.
+      fireAndForget(() => this.autoPushToTwenty(workspaceId, transcript), "autoPushToTwenty");
+      return;
+    }
+
     if (kind === "googleDrive" || kind === "oneDrive") {
       // Reconstruct a minimal TranscriptAnalysis from persisted DB state.
       // Only `title`, `summary`, and `tasks` are read by autoExportDocument.
@@ -3130,6 +3179,62 @@ ${taskSummaries}`,
       },
     });
   }
+  /**
+   * Pushes the meeting note to Twenty.
+   *
+   * Company resolution, in order:
+   *   1. `explicitCompanyId` — picked by the user when saving the recording.
+   *      This is the normal path: one person meets several DIFFERENT clients in
+   *      a day, so the destination belongs to the meeting.
+   *   2. The project's linked company — a convenience default for recurring
+   *      client projects, not a requirement.
+   *
+   * Neither available → SKIPPED, not FAILED: it's a missing choice, not an error.
+   */
+  private async autoPushToTwenty(
+    workspaceId: string,
+    transcript: Transcript,
+    explicitCompanyId?: string,
+  ): Promise<void> {
+    let projectMetadata: unknown = null;
+    if (!explicitCompanyId?.trim() && transcript.projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: transcript.projectId, workspaceId },
+        select: { metadata: true },
+      });
+      projectMetadata = project?.metadata ?? null;
+    }
+    const companyId = resolveTwentyCompanyId(explicitCompanyId, projectMetadata);
+
+    if (!companyId) {
+      await this.setPostMeetingTaskStatus(transcript.id, "twenty", {
+        status: "SKIPPED",
+        error: "No Twenty company was chosen for this meeting.",
+      });
+      return;
+    }
+
+    await this.setPostMeetingTaskStatus(transcript.id, "twenty", { status: "PENDING" });
+    try {
+      const result = await twentyIntegrationService.pushMeetingNote(workspaceId, transcript, {
+        companyId,
+      });
+      await this.setPostMeetingTaskStatus(transcript.id, "twenty", {
+        status: "OK",
+        url: result.url,
+      });
+      logger.info(
+        `[twenty] auto-pushed transcript ${transcript.id} → note ${result.noteId} (${result.outcome})`,
+      );
+    } catch (err) {
+      await this.setPostMeetingTaskStatus(transcript.id, "twenty", {
+        status: "FAILED",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
   private async autoExportDocument(
     workspaceId: string,
     transcript: Transcript,

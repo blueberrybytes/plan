@@ -19,6 +19,7 @@ export type Context                = components['schemas']['ContextResponse'];
 export type ContextFileResponse    = components['schemas']['ContextFileResponse'];
 export type AiModel                = components['schemas']['AiModelResponse'];
 export type UserIntegrationSummary = components['schemas']['IntegrationSummaryResponse'];
+export type TwentyCompanyItem      = components['schemas']['TwentyCompanyItem'];
 export type DocDocumentResponse    = components['schemas']['DocDocumentResponse'];
 export type UserResponse           = components['schemas']['UserResponse'];
 export type CreateStandaloneTranscriptBody = components['schemas']['CreateStandaloneTranscriptBody'];
@@ -368,6 +369,17 @@ export const createPlanAiApi = (
       );
     },
 
+    /** Companies from the connected Twenty CRM, for the post-recording picker. */
+    async searchTwentyCompanies(q: string): Promise<TwentyCompanyItem[]> {
+      const req = async (force: boolean) =>
+        silentFetch(`${BASE_URL}/api/twenty/companies?q=${encodeURIComponent(q)}`, {
+          headers: await getAuthHeaders(force),
+        });
+
+      const res = await req(false);
+      return handleResponseWithRetry<TwentyCompanyItem[]>(res, () => req(true));
+    },
+
     async listIntegrations(): Promise<UserIntegrationSummary[]> {
       const req = async (force: boolean) =>
         silentFetch(`${BASE_URL}/api/integrations`, {
@@ -526,6 +538,8 @@ export const createPlanAiApi = (
         if (payload.syncToTrello) formData.append("syncToTrello", "true");
         if (payload.syncToNotion) formData.append("syncToNotion", "true");
         if (payload.syncToAsana) formData.append("syncToAsana", "true");
+        if (payload.syncToTwenty) formData.append("syncToTwenty", "true");
+        if (payload.twentyCompanyId) formData.append("twentyCompanyId", payload.twentyCompanyId);
         if (payload.exportToGoogleDrive) formData.append("exportToGoogleDrive", "true");
         if (payload.exportToOneDrive) formData.append("exportToOneDrive", "true");
         if (payload.createDoc) formData.append("createDoc", "true");

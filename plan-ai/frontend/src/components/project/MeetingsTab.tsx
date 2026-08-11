@@ -22,6 +22,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { useTranslation } from "react-i18next";
 import { useListProjectTranscriptsQuery } from "../../store/apis/projectApi";
 import MeetingsChatDrawer from "./MeetingsChatDrawer";
+import ProjectTwentyLinkCard from "./ProjectTwentyLinkCard";
 
 interface MeetingsTabProps {
   projectId: string;
@@ -148,6 +149,9 @@ const MeetingsTab: React.FC<MeetingsTabProps> = ({ projectId }) => {
       {/* The Project Digest card used to live here. It now sits above the tabs
           (ProjectDigestBanner) so it's the first thing seen when opening a
           project, instead of being buried two clicks deep in this tab. */}
+
+      {/* Renders itself only when Twenty is connected. */}
+      <ProjectTwentyLinkCard projectId={projectId} />
 
       {/* Saved questions — the questions a team actually asks every week.
           An empty chat box gets ignored; a row of concrete questions gets used.

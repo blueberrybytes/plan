@@ -3,6 +3,7 @@ import { BaseWorkspaceController } from "./BaseWorkspaceController";
 import type { AuthenticatedRequest } from "../middleware/authMiddleware";
 import type { ApiResponse } from "./controllerTypes";
 import prisma from "../prisma/prismaClient";
+import { Prisma } from "@prisma/client";
 import { twentyIntegrationService } from "../services/twentyIntegrationService";
 import type {
   TwentyManualConnectRequest,
@@ -11,6 +12,8 @@ import type {
   TwentyPersonItem,
   PushTranscriptToTwentyRequest,
   PushTranscriptToTwentyResponse,
+  LinkProjectToTwentyCompanyRequest,
+  ProjectTwentyLink,
 } from "../services/twentyTypes";
 
 @Route("api/twenty")
@@ -54,7 +57,10 @@ export class TwentyController extends BaseWorkspaceController {
     @Query() q?: string,
   ): Promise<ApiResponse<TwentyCompanyItem[]>> {
     const { workspaceId } = await this.getAuthorizedWorkspaceAccess(request);
-    return { status: 200, data: await twentyIntegrationService.searchCompanies(workspaceId, q ?? "") };
+    return {
+      status: 200,
+      data: await twentyIntegrationService.searchCompanies(workspaceId, q ?? ""),
+    };
   }
 
   @Get("people")
@@ -112,5 +118,54 @@ export class TwentyController extends BaseWorkspaceController {
         message: error instanceof Error ? error.message : "Failed to push the meeting to Twenty",
       };
     }
+  }
+
+  /**
+   * Links a project to a Twenty company so meetings recorded into it can be
+   * pushed unattended (the "Send to Twenty" toggle in the recorder / mobile).
+   */
+  @Post("link-project")
+  @Security("ClientLevel")
+  @Response<ApiResponse<null>>(404, "Project not found")
+  public async linkProject(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: LinkProjectToTwentyCompanyRequest,
+  ): Promise<ApiResponse<ProjectTwentyLink | null>> {
+    const { workspaceId } = await this.getAuthorizedWorkspaceAccess(request);
+
+    const project = await prisma.project.findFirst({
+      where: { id: body.projectId, workspaceId },
+      select: { id: true, metadata: true },
+    });
+    if (!project) {
+      this.setStatus(404);
+      return { status: 404, data: null, message: "Project not found" };
+    }
+
+    const metadata = ((project.metadata as Record<string, unknown> | null) ?? {}) as Record<
+      string,
+      unknown
+    >;
+    if (body.companyId) {
+      metadata.twentyCompanyId = body.companyId;
+      metadata.twentyCompanyName = body.companyName ?? null;
+    } else {
+      delete metadata.twentyCompanyId;
+      delete metadata.twentyCompanyName;
+    }
+
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { metadata: metadata as Prisma.InputJsonObject },
+    });
+
+    return {
+      status: 200,
+      data: {
+        projectId: project.id,
+        companyId: body.companyId,
+        companyName: body.companyId ? (body.companyName ?? null) : null,
+      },
+    };
   }
 }

@@ -8,6 +8,8 @@ type TwentyCompanyItem = components["schemas"]["TwentyCompanyItem"];
 type TwentyPersonItem = components["schemas"]["TwentyPersonItem"];
 type PushTranscriptToTwentyRequest = components["schemas"]["PushTranscriptToTwentyRequest"];
 type PushTranscriptToTwentyResponse = components["schemas"]["PushTranscriptToTwentyResponse"];
+type LinkProjectToTwentyCompanyRequest = components["schemas"]["LinkProjectToTwentyCompanyRequest"];
+type ProjectTwentyLink = components["schemas"]["ProjectTwentyLink"];
 
 export const twentyApi = createApi({
   reducerPath: "twentyApi",
@@ -34,6 +36,12 @@ export const twentyApi = createApi({
     >({
       query: (body) => ({ url: "/api/twenty/push-transcript", method: "POST", body }),
     }),
+    linkProjectToTwentyCompany: builder.mutation<
+      { data: ProjectTwentyLink },
+      LinkProjectToTwentyCompanyRequest
+    >({
+      query: (body) => ({ url: "/api/twenty/link-project", method: "POST", body }),
+    }),
   }),
 });
 
@@ -43,4 +51,5 @@ export const {
   useLazySearchTwentyCompaniesQuery,
   useLazySearchTwentyPeopleQuery,
   usePushTranscriptToTwentyMutation,
+  useLinkProjectToTwentyCompanyMutation,
 } = twentyApi;

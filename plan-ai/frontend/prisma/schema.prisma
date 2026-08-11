@@ -303,6 +303,10 @@ model User {
   isMicrosoftAccount   Boolean               @default(false)
   hasVoiceProfile      Boolean               @default(false)
   hasCompletedHomeTour Boolean               @default(false)
+  /// Monday-morning email summarising last week's meetings. Opt-OUT: the value
+  /// of the digest is that it arrives without being asked for, so it defaults
+  /// on — but it is never sent to a user with no meetings that week.
+  weeklyDigestEmail    Boolean               @default(true)
   voiceProfileUrl      String?
   threads              ChatThread[]
   contexts             Context[]

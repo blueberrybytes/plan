@@ -108,6 +108,8 @@ interface CreateStandaloneTranscriptBody {
   syncToTrello?: boolean;
   syncToNotion?: boolean;
   syncToAsana?: boolean;
+  syncToTwenty?: boolean;
+  twentyCompanyId?: string;
   exportToGoogleDrive?: boolean;
   exportToOneDrive?: boolean;
   taskStrategy?: "AUTO" | "SINGLE_TICKET" | "SPECIFIC_COUNT";
@@ -344,6 +346,8 @@ export class TranscriptsController extends BaseWorkspaceController {
     @FormField() syncToTrello?: string,
     @FormField() syncToNotion?: string,
     @FormField() syncToAsana?: string,
+    @FormField() syncToTwenty?: string,
+    @FormField() twentyCompanyId?: string,
     @FormField() exportToGoogleDrive?: string,
     @FormField() exportToOneDrive?: string,
     @FormField() skipAi?: string,
@@ -495,6 +499,8 @@ export class TranscriptsController extends BaseWorkspaceController {
       syncToTrello: syncToTrello === "true",
       syncToNotion: syncToNotion === "true",
       syncToAsana: syncToAsana === "true",
+      syncToTwenty: syncToTwenty === "true",
+      twentyCompanyId,
       exportToGoogleDrive: exportToGoogleDrive === "true",
       exportToOneDrive: exportToOneDrive === "true",
       taskStrategy,
@@ -613,6 +619,8 @@ export class TranscriptsController extends BaseWorkspaceController {
           syncToTrello: body.syncToTrello,
           syncToNotion: body.syncToNotion,
           syncToAsana: body.syncToAsana,
+          syncToTwenty: body.syncToTwenty,
+          twentyCompanyId: body.twentyCompanyId,
           exportToGoogleDrive: body.exportToGoogleDrive,
           exportToOneDrive: body.exportToOneDrive,
           taskStrategy: body.taskStrategy,

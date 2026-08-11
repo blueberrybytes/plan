@@ -2,11 +2,7 @@ import { IntegrationProvider, IntegrationStatus, Prisma, type Transcript } from 
 import prisma from "../prisma/prismaClient";
 import { logger } from "../utils/logger";
 import type { TwentyIntegrationMetadata } from "./integrationMetadataTypes";
-import type {
-  TranscriptMetadata,
-  TwentyNoteRef,
-  SpeakerInsight,
-} from "./transcriptMetadataTypes";
+import type { TranscriptMetadata, TwentyNoteRef, SpeakerInsight } from "./transcriptMetadataTypes";
 import type {
   TwentyManualConnectRequest,
   TwentySummaryResponse,
@@ -153,7 +149,9 @@ class TwentyIntegrationService {
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(`Twenty API ${response.status} ${response.statusText}: ${body.slice(0, 300)}`);
+      throw new Error(
+        `Twenty API ${response.status} ${response.statusText}: ${body.slice(0, 300)}`,
+      );
     }
     return (await response.json()) as T;
   }
@@ -261,7 +259,14 @@ class TwentyIntegrationService {
     if (!integration) return [];
 
     const params = new URLSearchParams({ limit: "30" });
-    if (query.trim()) params.set("filter", `name.firstName[ilike]:%${query.trim()}%`);
+    // Match either name part: attendee names arrive from diarization as whatever
+    // was said out loud, which is just as often a surname ("¿lo mira Zhao?").
+    // Filtering on firstName alone silently returned zero rows for those.
+    // `or(...)` syntax verified against a live Twenty instance (2026-08).
+    if (query.trim()) {
+      const q = query.trim();
+      params.set("filter", `or(name.firstName[ilike]:%${q}%,name.lastName[ilike]:%${q}%)`);
+    }
 
     try {
       const payload = await this.fetchTwenty<unknown>(
@@ -320,7 +325,13 @@ class TwentyIntegrationService {
   private async createNoteWithTargets(
     baseUrl: string,
     apiKey: string,
-    args: { title: string; markdown: string; companyId: string; personIds: string[]; opportunityId?: string },
+    args: {
+      title: string;
+      markdown: string;
+      companyId: string;
+      personIds: string[];
+      opportunityId?: string;
+    },
   ): Promise<{ noteId: string; url?: string }> {
     const created = await this.fetchTwenty<unknown>(baseUrl, apiKey, "/notes", {
       method: "POST",
@@ -333,9 +344,15 @@ class TwentyIntegrationService {
 
     // Targets are what make the note show up on each record's timeline. Created
     // one by one on purpose: a failed link must not lose the note itself.
-    const targets: Record<string, string>[] = [{ companyId: args.companyId }];
-    for (const personId of args.personIds) targets.push({ personId });
-    if (args.opportunityId) targets.push({ opportunityId: args.opportunityId });
+    //
+    // Field names verified against a live Twenty instance (2026-08): noteTarget
+    // exposes MORPH_RELATION fields `targetCompany` / `targetPerson` /
+    // `targetOpportunity`, so the REST foreign keys are `targetCompanyId` etc.
+    // The obvious-looking `companyId` is rejected with
+    // 'Object noteTarget doesn't have any "companyId" field.'
+    const targets: Record<string, string>[] = [{ targetCompanyId: args.companyId }];
+    for (const personId of args.personIds) targets.push({ targetPersonId: personId });
+    if (args.opportunityId) targets.push({ targetOpportunityId: args.opportunityId });
 
     let linked = 0;
     for (const target of targets) {
@@ -380,7 +397,12 @@ class TwentyIntegrationService {
   public async pushMeetingNote(
     workspaceId: string,
     transcript: Transcript,
-    args: { companyId: string; personIds?: string[]; opportunityId?: string; forceSeparateNote?: boolean },
+    args: {
+      companyId: string;
+      personIds?: string[];
+      opportunityId?: string;
+      forceSeparateNote?: boolean;
+    },
   ): Promise<PushTranscriptToTwentyResponse> {
     const integration = await this.getIntegration(workspaceId);
     if (!integration) throw new Error("Twenty is not connected for this workspace");

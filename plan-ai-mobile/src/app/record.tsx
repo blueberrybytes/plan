@@ -29,7 +29,7 @@ import {
 } from "react-native-paper";
 import Markdown from "react-native-markdown-display";
 import { useRouter, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   requestRecordingPermissionsAsync,
@@ -38,7 +38,7 @@ import {
 import { File, Paths, Directory } from "expo-file-system";
 import notifee from "@notifee/react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Project, Context } from "@/services/planAiApi";
+import { Project, Context, TwentyCompanyItem } from "@/services/planAiApi";
 import * as Location from "expo-location";
 import * as Sentry from "@sentry/react-native";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
@@ -317,6 +317,7 @@ export default function RecordScreen() {
   const [syncToTrello, setSyncToTrello] = useState(false);
   const [syncToNotion, setSyncToNotion] = useState(false);
   const [syncToAsana, setSyncToAsana] = useState(false);
+  const [syncToTwenty, setSyncToTwenty] = useState(false);
   const [exportToGoogleDrive, setExportToGoogleDrive] = useState(false);
   const [exportToOneDrive, setExportToOneDrive] = useState(false);
   const [createDoc, setCreateDoc] = useState(true);
@@ -326,6 +327,7 @@ export default function RecordScreen() {
   const [hasTrello, setHasTrello] = useState(false);
   const [hasNotion, setHasNotion] = useState(false);
   const [hasAsana, setHasAsana] = useState(false);
+  const [hasTwenty, setHasTwenty] = useState(false);
   const [hasGoogleDrive, setHasGoogleDrive] = useState(false);
   const [hasOneDrive, setHasOneDrive] = useState(false);
 
@@ -335,6 +337,42 @@ export default function RecordScreen() {
   const [taskCount, setTaskCount] = useState<number>(5);
 
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // The Twenty company is chosen PER RECORDING: the same person meets several
+  // different clients in a day, and most recordings have no project yet. A
+  // project's linked company only pre-fills this.
+  const [twentyCompany, setTwentyCompany] = useState<TwentyCompanyItem | null>(null);
+  const [twentyCompanies, setTwentyCompanies] = useState<TwentyCompanyItem[]>([]);
+  const [twentyQuery, setTwentyQuery] = useState("");
+  const [twentyPickerOpen, setTwentyPickerOpen] = useState(false);
+
+  // Pre-fill from the project's linked company (convenience for recurring
+  // clients) — the user can still change it for this meeting.
+  useEffect(() => {
+    if (twentyCompany) return;
+    const project = projects.find((p) => p.id === selectedProjectId);
+    const meta =
+      (project?.metadata as { twentyCompanyId?: string; twentyCompanyName?: string } | null) ??
+      null;
+    if (meta?.twentyCompanyId) {
+      setTwentyCompany({
+        id: meta.twentyCompanyId,
+        name: meta.twentyCompanyName ?? "Linked company",
+      });
+    }
+  }, [projects, selectedProjectId, twentyCompany]);
+
+  // Debounced search against the self-hosted CRM.
+  useEffect(() => {
+    if (!hasTwenty || twentyQuery.trim().length < 2) return;
+    const handle = setTimeout(() => {
+      api
+        .searchTwentyCompanies(twentyQuery.trim())
+        .then(setTwentyCompanies)
+        .catch(() => setTwentyCompanies([]));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [twentyQuery, hasTwenty, api]);
   const [contexts, setContexts] = useState<Context[]>([]);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
 
@@ -533,11 +571,15 @@ export default function RecordScreen() {
           const oneDrive = (ints as any[]).find(
             (i) => i.provider === "ONEDRIVE" && i.status === "CONNECTED",
           );
+          const twenty = (ints as any[]).find(
+            (i) => i.provider === "TWENTY" && i.status === "CONNECTED",
+          );
           if (jira) setHasJira(true);
           if (linear) setHasLinear(true);
           if (trello) setHasTrello(true);
           if (notion) setHasNotion(true);
           if (asana) setHasAsana(true);
+          if (twenty) setHasTwenty(true);
           if (googleDrive) {
             setHasGoogleDrive(true);
             setExportToGoogleDrive(true);
@@ -553,6 +595,7 @@ export default function RecordScreen() {
           setSyncToTrello(false);
           setSyncToNotion(false);
           setSyncToAsana(false);
+          setSyncToTwenty(false);
         })
         .finally(() => {
           setIsLoadingMetadata(false);
@@ -662,6 +705,8 @@ export default function RecordScreen() {
         syncToTrello,
         syncToNotion,
         syncToAsana,
+        syncToTwenty: syncToTwenty && Boolean(twentyCompany),
+        twentyCompanyId: twentyCompany?.id,
         exportToGoogleDrive,
         exportToOneDrive,
         createDoc,
@@ -707,6 +752,8 @@ export default function RecordScreen() {
           syncToTrello,
           syncToNotion,
           syncToAsana,
+          syncToTwenty: syncToTwenty && Boolean(twentyCompany),
+        twentyCompanyId: twentyCompany?.id,
           exportToGoogleDrive,
           exportToOneDrive,
           createDoc,
@@ -1086,6 +1133,40 @@ export default function RecordScreen() {
                   disabled={!hasAsana}
                 />
               </View>
+
+              {/* Twenty needs a destination company, which comes from the
+                  project's link — so this stays disabled until the selected
+                  project is mapped in the web app. */}
+              {hasTwenty && (
+                <View style={{ marginTop: 12 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text>Send to Twenty CRM</Text>
+                    <Switch value={syncToTwenty} onValueChange={setSyncToTwenty} />
+                  </View>
+                  {syncToTwenty && (
+                    <Button
+                      mode="outlined"
+                      compact
+                      icon="office-building"
+                      onPress={() => setTwentyPickerOpen(true)}
+                      style={{ marginTop: 8 }}
+                    >
+                      {twentyCompany ? twentyCompany.name : "Choose company…"}
+                    </Button>
+                  )}
+                  {syncToTwenty && !twentyCompany && (
+                    <Text style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
+                      Pick a company or the note will be skipped.
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
 
             <View
@@ -1199,6 +1280,58 @@ export default function RecordScreen() {
             {LANGUAGE_OPTIONS.find((l) => l.code === language)?.name ||
               "Language"}
           </Button>
+
+          {/* Twenty company picker — the destination for THIS meeting's note. */}
+          <Portal>
+            <Modal
+              visible={twentyPickerOpen}
+              onDismiss={() => {
+                setTwentyPickerOpen(false);
+                setTwentyQuery("");
+              }}
+              contentContainerStyle={{
+                backgroundColor: theme.colors.background,
+                padding: 20,
+                margin: 20,
+                borderRadius: 12,
+                maxHeight: "80%",
+              }}
+            >
+              <Text variant="titleMedium" style={{ marginBottom: 12, fontWeight: "bold" }}>
+                Company in Twenty
+              </Text>
+              <TextInput
+                mode="outlined"
+                dense
+                autoFocus
+                placeholder="Search companies…"
+                value={twentyQuery}
+                onChangeText={setTwentyQuery}
+                left={<TextInput.Icon icon="magnify" />}
+              />
+              <ScrollView style={{ marginTop: 12 }} keyboardShouldPersistTaps="handled">
+                {twentyQuery.trim().length < 2 ? (
+                  <Text style={{ opacity: 0.6, padding: 8 }}>Type at least 2 characters…</Text>
+                ) : twentyCompanies.length === 0 ? (
+                  <Text style={{ opacity: 0.6, padding: 8 }}>No companies found</Text>
+                ) : (
+                  twentyCompanies.map((c) => (
+                    <List.Item
+                      key={c.id}
+                      title={c.name}
+                      description={c.domainName || undefined}
+                      left={(props) => <List.Icon {...props} icon="office-building" />}
+                      onPress={() => {
+                        setTwentyCompany(c);
+                        setTwentyPickerOpen(false);
+                        setTwentyQuery("");
+                      }}
+                    />
+                  ))
+                )}
+              </ScrollView>
+            </Modal>
+          </Portal>
 
           <Portal>
             <Modal

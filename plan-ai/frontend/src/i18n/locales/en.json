@@ -1432,5 +1432,20 @@
   },
   "prototype": {
     "notFound": "This prototype is no longer available."
+  },
+  "twenty": {
+    "link": {
+      "title": "Twenty CRM",
+      "linkedGeneric": "Linked",
+      "subtitleLinked": "Meetings recorded into this project can be sent to this company automatically.",
+      "subtitleEmpty": "Pick the company in Twenty this project belongs to. Until then, the recorder can't file its meeting notes.",
+      "search": "Search companies in Twenty…",
+      "typeToSearch": "Type at least 2 characters…",
+      "noResults": "No companies found",
+      "unlink": "Unlink",
+      "linked": "Project linked to {{name}} in Twenty.",
+      "unlinked": "Project unlinked from Twenty.",
+      "error": "Couldn't update the Twenty link."
+    }
   }
 }

@@ -277,6 +277,31 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ProjectTwentyLink": {
+        "dataType": "refObject",
+        "properties": {
+            "projectId": {"dataType":"string","required":true},
+            "companyId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "companyName": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ApiResponse_ProjectTwentyLink-or-null_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string"},"data":{"dataType":"union","subSchemas":[{"dataType":"union","subSchemas":[{"ref":"ProjectTwentyLink"},{"dataType":"enum","enums":[null]}]},{"dataType":"enum","enums":[null]}],"required":true},"status":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinkProjectToTwentyCompanyRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "projectId": {"dataType":"string","required":true},
+            "companyId": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "companyName": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}]},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TrelloManualConnectRequest": {
         "dataType": "refObject",
         "properties": {
@@ -1017,6 +1042,8 @@ const models: TsoaRoute.Models = {
             "syncToTrello": {"dataType":"boolean"},
             "syncToNotion": {"dataType":"boolean"},
             "syncToAsana": {"dataType":"boolean"},
+            "syncToTwenty": {"dataType":"boolean"},
+            "twentyCompanyId": {"dataType":"string"},
             "exportToGoogleDrive": {"dataType":"boolean"},
             "exportToOneDrive": {"dataType":"boolean"},
             "taskStrategy": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["AUTO"]},{"dataType":"enum","enums":["SINGLE_TICKET"]},{"dataType":"enum","enums":["SPECIFIC_COUNT"]}]},
@@ -2872,6 +2899,38 @@ export function RegisterRoutes(app: Router,opts?:{multer?:ReturnType<typeof mult
             }
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsTwentyController_linkProject: Record<string, TsoaRoute.ParameterSchema> = {
+                request: {"in":"request","name":"request","required":true,"dataType":"object"},
+                body: {"in":"body","name":"body","required":true,"ref":"LinkProjectToTwentyCompanyRequest"},
+        };
+        app.post('/api/twenty/link-project',
+            authenticateMiddleware([{"ClientLevel":[]}]),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController)),
+            ...(fetchMiddlewares<RequestHandler>(TwentyController.prototype.linkProject)),
+
+            async function TwentyController_linkProject(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsTwentyController_linkProject, request, response });
+
+                const controller = new TwentyController();
+
+              await templateService.apiHandler({
+                methodName: 'linkProject',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsTrelloController_manualConnect: Record<string, TsoaRoute.ParameterSchema> = {
                 request: {"in":"request","name":"request","required":true,"dataType":"object"},
                 body: {"in":"body","name":"body","required":true,"ref":"TrelloManualConnectRequest"},
@@ -4137,6 +4196,8 @@ export function RegisterRoutes(app: Router,opts?:{multer?:ReturnType<typeof mult
                 syncToTrello: {"in":"formData","name":"syncToTrello","dataType":"string"},
                 syncToNotion: {"in":"formData","name":"syncToNotion","dataType":"string"},
                 syncToAsana: {"in":"formData","name":"syncToAsana","dataType":"string"},
+                syncToTwenty: {"in":"formData","name":"syncToTwenty","dataType":"string"},
+                twentyCompanyId: {"in":"formData","name":"twentyCompanyId","dataType":"string"},
                 exportToGoogleDrive: {"in":"formData","name":"exportToGoogleDrive","dataType":"string"},
                 exportToOneDrive: {"in":"formData","name":"exportToOneDrive","dataType":"string"},
                 skipAi: {"in":"formData","name":"skipAi","dataType":"string"},
