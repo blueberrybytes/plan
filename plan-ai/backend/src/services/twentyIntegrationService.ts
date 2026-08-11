@@ -58,18 +58,26 @@ const TWENTY_TEXT_DOCUMENT_CATEGORY = "TEXT_DOCUMENT";
  */
 const attachmentFileFieldIds = new Map<string, string>();
 
+/** `<baseUrl>|<nameSingular>` → object metadata id. Same reasoning as above. */
+const objectMetadataIds = new Map<string, string>();
+
 /**
- * Timeline event name, following Twenty's own `<object>.<verb>` convention
- * (`company.created`, `opportunity.updated`).
+ * Timeline event name.
  *
  * Why write this at all when the note already lands on the company: a note is
  * stamped when we PUSH it, which can be hours after the meeting, so the CRM
  * timeline tells the wrong story. A timeline activity carries its own
- * `happensAt`, so the meeting sits where it actually happened. Verified against
- * a live instance (2026-08): notes created through the API generate no timeline
- * activity of their own, so this adds an entry rather than duplicating one.
+ * `happensAt`, so the meeting sits where it actually happened. Notes created
+ * through the API generate no timeline activity of their own, so this adds an
+ * entry rather than duplicating one.
+ *
+ * The name is NOT free-form. Twenty's timeline renders each entry from a known
+ * event name plus the linked-record fields; a made-up name (we tried
+ * `meeting.recorded`) is accepted by the API and then renders as a blank row
+ * with a generic icon — worse than no entry at all in a client's CRM. Verified
+ * on a live instance (2026-08) by putting candidate shapes side by side.
  */
-const TWENTY_MEETING_EVENT = "meeting.recorded";
+const TWENTY_MEETING_EVENT = "linked-note.created";
 
 // ── meeting identity tuning ────────────────────────────────────────────────
 /** Client clocks drift; widen both intervals before comparing. */
@@ -453,11 +461,18 @@ class TwentyIntegrationService {
   }
 
   /**
-   * The id of `attachment.file`, which `createFileUpload` needs to know which
-   * field the upload belongs to. Two cheap queries (~4 KB), then cached.
+   * Metadata id of a standard object (`attachment`, `note`, …).
+   *
+   * ObjectFilter can't filter by name, so this pulls the (small) list of object
+   * names once per host and caches the answer.
    */
-  private async resolveAttachmentFileFieldId(baseUrl: string, apiKey: string): Promise<string> {
-    const cached = attachmentFileFieldIds.get(baseUrl);
+  private async resolveObjectMetadataId(
+    baseUrl: string,
+    apiKey: string,
+    nameSingular: string,
+  ): Promise<string> {
+    const cacheKey = `${baseUrl}|${nameSingular}`;
+    const cached = objectMetadataIds.get(cacheKey);
     if (cached) return cached;
 
     const objects = await this.metadataGraphql<{
@@ -468,13 +483,28 @@ class TwentyIntegrationService {
       `{ objects(paging: { first: 500 }) { edges { node { id nameSingular } } } }`,
     );
 
-    const attachmentObject = objects.objects.edges
-      .map((e) => e.node)
-      .find((n) => n.nameSingular === "attachment");
-    if (!attachmentObject) throw new Error("Twenty has no `attachment` object in this workspace");
+    // Cache every object while we have them — the next lookup is free.
+    for (const { node } of objects.objects.edges) {
+      objectMetadataIds.set(`${baseUrl}|${node.nameSingular}`, node.id);
+    }
 
-    // ObjectFilter can't filter by name, but FieldFilter takes objectMetadataId,
-    // which keeps this from pulling every field of every object.
+    const found = objectMetadataIds.get(cacheKey);
+    if (!found) throw new Error(`Twenty has no \`${nameSingular}\` object in this workspace`);
+    return found;
+  }
+
+  /**
+   * The id of `attachment.file`, which `createFileUpload` needs to know which
+   * field the upload belongs to. Two cheap queries (~4 KB), then cached.
+   */
+  private async resolveAttachmentFileFieldId(baseUrl: string, apiKey: string): Promise<string> {
+    const cached = attachmentFileFieldIds.get(baseUrl);
+    if (cached) return cached;
+
+    const objectId = await this.resolveObjectMetadataId(baseUrl, apiKey, "attachment");
+
+    // FieldFilter DOES take objectMetadataId, which keeps this from pulling
+    // every field of every object.
     const fields = await this.metadataGraphql<{
       fields: { edges: { node: { id: string; name: string; type: string } }[] };
     }>(
@@ -485,7 +515,7 @@ class TwentyIntegrationService {
            edges { node { id name type } }
          }
        }`,
-      { objectId: attachmentObject.id },
+      { objectId },
     );
 
     const fileField = fields.fields.edges.map((e) => e.node).find((f) => f.name === "file");
@@ -579,9 +609,10 @@ class TwentyIntegrationService {
   /**
    * Put the meeting on the company's timeline at the time it actually happened.
    *
-   * `properties` is free-form JSON, so it carries a human-readable summary of
-   * the meeting — worth filling in because a custom event name is not one Twenty
-   * knows how to render specially, and these values are what remains legible.
+   * The entry describes the note we just created, which is why it needs the
+   * note's id and title: Twenty's timeline renders "<who> created a note
+   * <name>" from the `linkedRecord*` fields, and without them the row shows a
+   * generic icon and no text at all.
    *
    * Links through `targetCompanyId`: timelineActivity exposes MORPH_RELATION
    * targets, so plain `companyId` is rejected — same as noteTarget and
@@ -591,38 +622,28 @@ class TwentyIntegrationService {
     baseUrl: string,
     apiKey: string,
     args: {
-      transcript: Transcript;
       companyId: string;
       happensAt: Date;
-      noteId?: string;
+      noteId: string;
+      noteTitle: string;
     },
   ): Promise<string> {
-    const { transcript } = args;
-    const metadata = (transcript.metadata ?? null) as TranscriptMetadata | null;
-    const speakers: SpeakerInsight[] = metadata?.speakers ?? [];
-
-    const properties: Record<string, unknown> = {
-      title: transcript.title?.trim() || "Reunión",
-      source: "Plan AI",
-    };
-    if (transcript.durationSeconds) {
-      properties.duration = `${Math.round(transcript.durationSeconds / 60)} min`;
-    }
-    if (speakers.length > 0) {
-      properties.attendees = speakers
-        .map((s) => s.identifiedName?.trim() || s.label)
-        .filter(Boolean)
-        .join(", ");
-    }
-    if (args.noteId) properties.noteId = args.noteId;
+    const noteObjectId = await this.resolveObjectMetadataId(baseUrl, apiKey, "note");
 
     const created = await this.fetchTwenty<unknown>(baseUrl, apiKey, "/timelineActivities", {
       method: "POST",
       body: JSON.stringify({
         name: TWENTY_MEETING_EVENT,
+        // The reason this entry exists: `happensAt` is ours to set, so the
+        // meeting lands where it happened rather than where it was uploaded.
         happensAt: args.happensAt.toISOString(),
-        properties,
         targetCompanyId: args.companyId,
+        // Twenty's own `.created` rows carry an empty properties object; the
+        // meeting's details live in the note this points at.
+        properties: {},
+        linkedObjectMetadataId: noteObjectId,
+        linkedRecordId: args.noteId,
+        linkedRecordCachedName: args.noteTitle,
       }),
     });
 
@@ -810,10 +831,10 @@ class TwentyIntegrationService {
               integration.baseUrl,
               integration.apiKey,
               {
-                transcript,
                 companyId: args.companyId,
                 happensAt: interval.startedAt,
                 noteId: note.noteId,
+                noteTitle: title,
               },
             );
           } catch (timelineError) {

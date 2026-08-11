@@ -19,8 +19,10 @@ graph TD
     AI_Deepgram[🎙️ Deepgram API<br>Audio Transcription]
     AI_OpenRouter[🧠 OpenRouter API<br>LLM Processing]
     Auth[🔐 Firebase<br>Authentication]
-    Ext_Integrations[🔌 Integrations<br>Jira, Linear, Trello, Notion]
+    Ext_Trackers[🔌 Issue Trackers<br>Jira, Linear, Trello, Notion, Asana]
+    Ext_Crm[🏢 CRM<br>Twenty]
     Ext_Cloud[☁️ Cloud Storage<br>Google Drive, OneDrive]
+    Ext_Mcp[🤖 AI Assistants<br>MCP server]
 
     %% Flow
     Mobile -->|Uploads Audio| Backend
@@ -29,12 +31,18 @@ graph TD
     Backend <--> DB
     Backend <--> AI_Deepgram
     Backend <--> AI_OpenRouter
-    Backend <--> Ext_Integrations
+    Backend <--> Ext_Trackers
+    Backend <--> Ext_Crm
     Backend <--> Ext_Cloud
+    Ext_Mcp -->|Reads meetings & tasks| Backend
     Mobile --> Auth
     Web --> Auth
     Desktop --> Auth
 ```
+
+Outbound integrations all follow the same shape: credentials are stored per **workspace**, never globally, and each post-meeting step reports its own status back onto the meeting so a failed sync is visible instead of silently missing.
+
+The MCP server is the one arrow pointing inwards — an external AI assistant reading your workspace rather than Plan AI writing to a third party. See [MCP Server](/features/mcp-server).
 
 ## The Backend Intelligence Pipeline
 

@@ -1,6 +1,6 @@
-# Task Sync (Jira, Linear, Trello, Notion)
+# Task Sync (Jira, Linear, Trello, Notion, Asana)
 
-The primary "wedge" feature of Plan AI is automating the most tedious part of technical project management: writing and scoping tickets. 
+The primary "wedge" feature of Plan AI is automating the most tedious part of technical project management: writing and scoping tickets.
 
 Rather than a TPM spending hours listening to a meeting recording and manually typing out acceptance criteria, Plan AI generates perfectly scoped tickets instantly.
 
@@ -21,10 +21,31 @@ Once the tickets are generated, you can push them directly to your external issu
 
 1.  Review the generated ticket in the Plan AI dashboard.
 2.  Click the **Push** icon next to the ticket.
-3.  Select your destination (e.g., Jira, Linear, Trello, or Notion).
+3.  Select your destination — Jira, Linear, Trello, Notion or Asana.
 4.  The ticket will be created instantly in your backlog with the correct formatting.
 
-*(Note: Jira, Linear, Trello, and Notion integrations must be configured by an Admin in the Workspace Settings before you can push tickets).*
+*(Integrations must be configured by an Admin in the Workspace Settings before you can push tickets.)*
+
+## Doing it automatically
+
+You don't have to push ticket by ticket. On the save screen of the recorder and the mobile app there is a toggle per destination — tick the ones you want and everything the meeting produces is synced as soon as processing finishes.
+
+The same screen controls the other post-meeting outputs: generating a document or slide deck, exporting to Google Drive or OneDrive, and [sending the meeting to your CRM](/features/crm-twenty).
+
+## Knowing what actually happened
+
+Every automatic step reports back on the meeting as a badge, so a sync that failed is visible rather than silently missing:
+
+| Badge | Meaning |
+| --- | --- |
+| **Pending** | Queued or in flight |
+| **OK** | Created, with a link to the result |
+| **Skipped** | Not run, with the reason (for example, no CRM company was chosen) |
+| **Failed** | It broke, with the error |
+
+A step that was requested always ends up with a badge. If you asked for something and see nothing at all, that's a bug worth reporting — not a step that quietly decided not to run.
+
+Failed steps can be retried individually from the meeting view; you don't have to reprocess the whole recording.
 
 ## Using Contexts for Perfect Scoping
 

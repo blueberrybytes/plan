@@ -45,8 +45,10 @@ export default withMermaid(defineConfig({
           { text: 'Recordings & Transcripts', link: '/features/recordings' },
           { text: 'Contexts & Advanced RAG', link: '/features/contexts-rag' },
           { text: 'Plan Cortex', link: '/features/cortex' },
-          { text: 'Task Sync (Jira, Linear, Trello, Notion)', link: '/features/task-sync' },
-          { text: 'Docs & Diagrams', link: '/features/docs-diagrams' }
+          { text: 'Task Sync (Jira, Linear, Trello, Notion, Asana)', link: '/features/task-sync' },
+          { text: 'CRM Sync (Twenty)', link: '/features/crm-twenty' },
+          { text: 'Docs & Diagrams', link: '/features/docs-diagrams' },
+          { text: 'MCP Server', link: '/features/mcp-server' }
         ]
       },
       {

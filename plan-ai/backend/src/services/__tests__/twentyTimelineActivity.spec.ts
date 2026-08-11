@@ -1,10 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
- * A note is stamped when we PUSH it, which can be hours after the meeting, so
- * on its own the CRM timeline tells the wrong story. The timeline activity
- * carries its own `happensAt` — that displacement is the entire reason this
- * exists, so it's what these tests guard.
+ * Two things are being guarded here, and both were learned the hard way against
+ * a live instance:
+ *
+ * 1. A note is stamped when we PUSH it, which can be hours after the meeting,
+ *    so on its own the CRM timeline tells the wrong story. The entry carries
+ *    its own `happensAt` — that displacement is the whole reason it exists.
+ *
+ * 2. The event name is NOT free-form. A made-up name (`meeting.recorded`) is
+ *    accepted by the API and then renders as a blank row with a generic icon.
+ *    Twenty builds the label from a known name plus the `linkedRecord*` fields,
+ *    so those are load-bearing, not decoration.
  */
 
 const { db } = vi.hoisted(() => ({
@@ -22,116 +29,97 @@ import { twentyIntegrationService } from "../twentyIntegrationService";
 
 const BASE = "https://crm.example.com";
 const MEETING_START = new Date("2026-08-11T09:00:00.000Z");
-
-const transcript = (over: Record<string, unknown> = {}) =>
-  ({
-    id: "t-1",
-    title: "Revisión trimestral con Uriach",
-    durationSeconds: 2700,
-    // Uploaded hours after the meeting ended — the case that motivates this.
-    recordedAt: new Date("2026-08-11T14:30:00Z"),
-    createdAt: new Date("2026-08-11T14:30:00Z"),
-    metadata: {
-      speakers: [
-        { label: "Speaker 0", identifiedName: "Xavi", role: "Plan AI" },
-        { label: "Speaker 1", identifiedName: "Alex", role: "Uriach" },
-      ],
-    },
-    ...over,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any;
+const UPLOADED_AT = new Date("2026-08-11T14:30:00.000Z");
 
 let sent: Record<string, unknown>;
 
+const mockTwenty = () => {
+  global.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
+    const href = String(url);
+    const json = (payload: unknown) =>
+      ({ ok: true, status: 200, json: async () => payload, text: async () => "" }) as Response;
+
+    if (href.endsWith("/metadata")) {
+      return json({
+        data: { objects: { edges: [{ node: { id: "obj-note", nameSingular: "note" } }] } },
+      });
+    }
+    sent = JSON.parse(String(init?.body ?? "{}"));
+    return json({ data: { createTimelineActivity: { id: "tl-1" } } });
+  }) as unknown as typeof fetch;
+};
+
+const record = (over: Record<string, unknown> = {}, base = BASE) =>
+  twentyIntegrationService.recordMeetingOnTimeline(base, "key", {
+    companyId: "co-uriach",
+    happensAt: MEETING_START,
+    noteId: "note-9",
+    noteTitle: "Revisión trimestral · 2026-08-11",
+    ...over,
+  });
+
 beforeEach(() => {
   vi.clearAllMocks();
-  global.fetch = vi.fn(async (_url: string | URL, init?: RequestInit) => {
-    sent = JSON.parse(String(init?.body ?? "{}"));
-    return {
-      ok: true,
-      status: 201,
-      json: async () => ({ data: { createTimelineActivity: { id: "tl-1" } } }),
-      text: async () => "",
-    } as Response;
-  }) as unknown as typeof fetch;
+  mockTwenty();
 });
 
 describe("recordMeetingOnTimeline", () => {
   it("stamps the entry at the meeting, not at the moment we pushed it", async () => {
-    await twentyIntegrationService.recordMeetingOnTimeline(BASE, "key", {
-      transcript: transcript(),
-      companyId: "co-uriach",
-      happensAt: MEETING_START,
-    });
+    await record();
 
     expect(sent.happensAt).toBe(MEETING_START.toISOString());
-    // Guard the actual bug: falling back to upload time would put the meeting
-    // in the wrong place on the timeline and nobody would notice.
-    expect(sent.happensAt).not.toBe(new Date("2026-08-11T14:30:00Z").toISOString());
+    expect(sent.happensAt).not.toBe(UPLOADED_AT.toISOString());
+  });
+
+  it("carries the linked-record fields the timeline label is built from", async () => {
+    await record();
+
+    // Without these three the row renders empty — the failure that sent us
+    // back to the drawing board.
+    expect(sent.linkedObjectMetadataId).toBe("obj-note");
+    expect(sent.linkedRecordId).toBe("note-9");
+    expect(sent.linkedRecordCachedName).toBe("Revisión trimestral · 2026-08-11");
+  });
+
+  it("uses an event name Twenty knows how to render", async () => {
+    await record();
+
+    // A custom name is accepted by the API and silently unrenderable, so this
+    // pins the verified value rather than just the naming convention.
+    expect(sent.name).toBe("linked-note.created");
   });
 
   it("links through targetCompanyId — plain companyId is rejected by Twenty", async () => {
-    await twentyIntegrationService.recordMeetingOnTimeline(BASE, "key", {
-      transcript: transcript(),
-      companyId: "co-uriach",
-      happensAt: MEETING_START,
-    });
+    await record();
 
     expect(sent.targetCompanyId).toBe("co-uriach");
     expect(sent).not.toHaveProperty("companyId");
   });
 
-  it("follows Twenty's own <object>.<verb> event naming", async () => {
-    await twentyIntegrationService.recordMeetingOnTimeline(BASE, "key", {
-      transcript: transcript(),
-      companyId: "co-1",
-      happensAt: MEETING_START,
-    });
-    expect(sent.name).toMatch(/^[a-z]+\.[a-z]+$/);
-  });
+  it("resolves the note object id once and caches it per host", async () => {
+    // A host no earlier test has touched: the cache lives at module scope, so
+    // reusing BASE here would measure the other tests' warm-up, not this.
+    const freshHost = "https://cache-probe.example.com";
 
-  it("carries a readable summary, since a custom event name renders generically", async () => {
-    await twentyIntegrationService.recordMeetingOnTimeline(BASE, "key", {
-      transcript: transcript(),
-      companyId: "co-1",
-      happensAt: MEETING_START,
-      noteId: "note-9",
-    });
+    await record({}, freshHost);
+    await record({}, freshHost);
 
-    expect(sent.properties).toMatchObject({
-      title: "Revisión trimestral con Uriach",
-      duration: "45 min",
-      attendees: "Xavi, Alex",
-      noteId: "note-9",
-      source: "Plan AI",
-    });
-  });
-
-  it("omits duration and attendees rather than emitting empty values", async () => {
-    await twentyIntegrationService.recordMeetingOnTimeline(BASE, "key", {
-      transcript: transcript({ durationSeconds: null, metadata: {} }),
-      companyId: "co-1",
-      happensAt: MEETING_START,
-    });
-
-    expect(sent.properties).not.toHaveProperty("duration");
-    expect(sent.properties).not.toHaveProperty("attendees");
+    const metadataCalls = (
+      global.fetch as unknown as { mock: { calls: [string][] } }
+    ).mock.calls.filter(([url]) => String(url).endsWith("/metadata"));
+    expect(metadataCalls.length).toBe(1);
   });
 
   it("fails loudly when Twenty returns no id", async () => {
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 201,
-      json: async () => ({ data: {} }),
-      text: async () => "",
-    })) as unknown as typeof fetch;
+    global.fetch = vi.fn(async (url: string | URL) => {
+      const json = (payload: unknown) =>
+        ({ ok: true, status: 200, json: async () => payload, text: async () => "" }) as Response;
+      if (String(url).endsWith("/metadata")) {
+        return json({ data: { objects: { edges: [{ node: { id: "obj-note", nameSingular: "note" } }] } } });
+      }
+      return json({ data: {} });
+    }) as unknown as typeof fetch;
 
-    await expect(
-      twentyIntegrationService.recordMeetingOnTimeline(BASE, "key", {
-        transcript: transcript(),
-        companyId: "co-1",
-        happensAt: MEETING_START,
-      }),
-    ).rejects.toThrow(/timeline activity id/i);
+    await expect(record()).rejects.toThrow(/timeline activity id/i);
   });
 });

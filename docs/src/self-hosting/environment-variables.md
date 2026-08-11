@@ -60,9 +60,12 @@ This is the most critical environment file. It handles database connections, API
 | `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret. | `xxxx` |
 | `MICROSOFT_TENANT_ID` | Microsoft Azure tenant ID. | `xxxx` |
 | `MICROSOFT_REDIRECT_URI` | Microsoft OAuth callback URL. | `http://localhost:8080/api/microsoft/callback` |
-| `NOTION_OAUTH_CLIENT_ID` | Notion OAuth client ID. | `xxxx` |
-| `NOTION_OAUTH_CLIENT_SECRET` | Notion OAuth client secret. | `xxxx` |
+| `NOTION_CLIENT_ID` | Notion OAuth client ID. | `xxxx` |
+| `NOTION_CLIENT_SECRET` | Notion OAuth client secret. | `xxxx` |
 | `NOTION_REDIRECT_URI` | Notion OAuth callback URL. | `http://localhost:8080/api/notion/callback` |
+| `ASANA_CLIENT_ID` | Asana OAuth client ID. | `xxxx` |
+| `ASANA_CLIENT_SECRET` | Asana OAuth client secret. | `xxxx` |
+| `ASANA_REDIRECT_URI` | Asana OAuth callback URL. | `http://localhost:8080/api/asana/callback` |
 | **Auth & Email** | | |
 | `FIREBASE_SERVICE_KEY` | Base64 encoded Firebase Service Account JSON. | `=` |
 | `FIREBASE_STORAGE_BUCKET` | Firebase Storage bucket name. | `plan-ai.appspot.com` |
@@ -77,6 +80,11 @@ This is the most critical environment file. It handles database connections, API
 | `STRIPE_PRICE_BUSINESS_MANAGED` | Stripe Price ID for the Business Managed tier (€65/seat/month). | `price_…` |
 | `STRIPE_CHECKOUT_SUCCESS_PATH` | Path appended to `APP_URL` for Stripe success redirect. | `/billing?status=success` |
 | `STRIPE_CHECKOUT_CANCEL_PATH` | Path appended to `APP_URL` for Stripe cancel redirect. | `/billing?status=canceled` |
+| `STRIPE_BYOK_TRIAL_DAYS` | Free-trial length for BYOK tiers. Leave empty for no trial. | `14` |
+
+::: tip Twenty CRM needs no variables here
+Twenty is self-hosted per customer, so its instance URL and API key are stored per **workspace** and entered in the app under Settings → Integrations — not in this file. See [CRM Sync](/features/crm-twenty).
+:::
 
 ## Frontend Variables (`plan-ai/frontend/.env`)
 
