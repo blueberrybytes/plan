@@ -40,11 +40,33 @@ const getBaseUrl = () => {
   return window.location.origin;
 };
 
-// Streamable HTTP (recommended) — single endpoint, used by the Claude Code CLI.
+// Streamable HTTP — the only endpoint we hand out. `/mcp/sse` is still served
+// for clients connected before the switch, but it's deprecated upstream and the
+// stdio bridge over it never reconnects after a deploy, so nothing here points
+// at it any more.
 const MCP_HTTP_ENDPOINT = `${getBaseUrl()}/mcp`;
-// Legacy SSE endpoint — still served as a fallback; used by the stdio bridge
-// snippet for Claude Desktop / Cursor.
-const MCP_SSE_ENDPOINT = `${getBaseUrl()}/mcp/sse`;
+
+/**
+ * Bridge config for clients that can't open a remote MCP connection themselves.
+ *
+ * `mcp-remote` speaks Streamable HTTP, so the bridge reaches the same endpoint
+ * as the native options. The header goes through an env var because Claude
+ * Desktop mangles argv entries containing spaces — "Bearer <token>" inline
+ * silently fails to authenticate.
+ */
+const bridgeSnippet = (token: string) => `"plan-ai": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "mcp-remote",
+    "${MCP_HTTP_ENDPOINT}",
+    "--header",
+    "Authorization:\${AUTH_HEADER}"
+  ],
+  "env": {
+    "AUTH_HEADER": "Bearer ${token}"
+  }
+}`;
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
 
@@ -287,18 +309,18 @@ const McpPanel: React.FC<McpPanelProps> = ({ workspaceId }) => {
 
           {tokens.length === 0 ? (
             <Alert severity="warning">
-              Create a token above to get started. Once created, you can download a Desktop
-              Extension to install in Claude Desktop in just one click!
+              Create a token above to get started. The setup command and config snippets appear here
+              once you have one, with your token already filled in.
             </Alert>
           ) : (
             <Stack spacing={3}>
               <Alert severity="info" sx={{ py: 0.5 }}>
                 Your full token was shown <strong>once</strong> when you created it. If you lost it,
-                revoke this one and create a new token. You can instantly download a pre-configured
-                extension right from the creation dialog!
+                revoke this one and create a new token — the creation dialog shows every snippet
+                with the token already in place.
               </Alert>
 
-              {/* Claude Code — one-line CLI (native SSE remote, no bridge) */}
+              {/* Claude Code — one-line CLI (native Streamable HTTP, no bridge) */}
               <Box
                 sx={{
                   p: 3,
@@ -404,12 +426,21 @@ const McpPanel: React.FC<McpPanelProps> = ({ workspaceId }) => {
                   bgcolor: "background.paper",
                 }}
               >
-                <Typography variant="h6" gutterBottom>
-                  Claude Desktop / Cursor (stdio bridge)
-                </Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6">Claude Desktop / Cursor (bridge)</Typography>
+                  <Tooltip title={copied ? "Copied!" : "Copy snippet"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleCopy(bridgeSnippet("YOUR_TOKEN_HERE"))}
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  To connect your remote Plan AI workspace, you need to add a small bridge
-                  configuration to your <code>claude_desktop_config.json</code> file.
+                  Only for clients that can&apos;t open a remote MCP connection on their own. If
+                  yours supports <code>&quot;type&quot;: &quot;http&quot;</code>, use the option
+                  above instead — it reconnects by itself, and the bridge doesn&apos;t.
                 </Typography>
 
                 <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
@@ -439,24 +470,16 @@ const McpPanel: React.FC<McpPanelProps> = ({ workspaceId }) => {
                     mt: 2,
                   }}
                 >
-                  {`"plan-ai": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "@cloudmcp/connect",
-    "--url",
-    "${MCP_SSE_ENDPOINT}",
-    "--header",
-    "Authorization: Bearer YOUR_TOKEN_HERE"
-  ]
-}`}
+                  {bridgeSnippet("YOUR_TOKEN_HERE")}
                 </Box>
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ mt: 2, fontStyle: "italic" }}
                 >
-                  Note: Make sure to replace YOUR_TOKEN_HERE with the token you generated above.
+                  Note: replace YOUR_TOKEN_HERE with the token you generated above. Keep it inside{" "}
+                  <code>AUTH_HEADER</code> — Claude Desktop drops argument values that contain
+                  spaces, so writing the Bearer header inline fails to authenticate.
                 </Typography>
               </Box>
             </Stack>
@@ -639,36 +662,39 @@ const McpPanel: React.FC<McpPanelProps> = ({ workspaceId }) => {
 
               <Divider />
               <Typography variant="subtitle2" fontWeight={600}>
-                Claude Desktop / Cursor (stdio bridge):
+                Claude Desktop / Cursor (bridge):
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Paste this into your <code>claude_desktop_config.json</code> (or Cursor&apos;s{" "}
-                <code>~/.cursor/mcp.json</code>) to connect your workspace automatically:
+                Only if your client can&apos;t connect to a remote MCP server directly. Paste it
+                into <code>claude_desktop_config.json</code> (or Cursor&apos;s{" "}
+                <code>~/.cursor/mcp.json</code>):
               </Typography>
-              <Box
-                component="pre"
-                sx={{
-                  bgcolor: "action.hover",
-                  borderRadius: 1.5,
-                  p: 2,
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                  overflowX: "auto",
-                  mt: 1,
-                  mb: 0,
-                }}
-              >
-                {`"plan-ai": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "@cloudmcp/connect",
-    "--url",
-    "${MCP_SSE_ENDPOINT}",
-    "--header",
-    "Authorization: Bearer ${rawToken}"
-  ]
-}`}
+              <Box sx={{ position: "relative" }}>
+                <Box
+                  component="pre"
+                  sx={{
+                    bgcolor: "action.hover",
+                    borderRadius: 1.5,
+                    p: 2,
+                    pr: 6,
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    overflowX: "auto",
+                    mt: 1,
+                    mb: 0,
+                  }}
+                >
+                  {bridgeSnippet(rawToken)}
+                </Box>
+                <Tooltip title={copied ? "Copied!" : "Copy snippet"}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleCopy(bridgeSnippet(rawToken))}
+                    sx={{ position: "absolute", top: 12, right: 8 }}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Stack>
           ) : (
