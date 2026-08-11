@@ -31,6 +31,7 @@ import Markdown from "react-native-markdown-display";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { TwentyCompanyPicker } from "@/components/TwentyCompanyPicker";
 import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
@@ -342,8 +343,6 @@ export default function RecordScreen() {
   // different clients in a day, and most recordings have no project yet. A
   // project's linked company only pre-fills this.
   const [twentyCompany, setTwentyCompany] = useState<TwentyCompanyItem | null>(null);
-  const [twentyCompanies, setTwentyCompanies] = useState<TwentyCompanyItem[]>([]);
-  const [twentyQuery, setTwentyQuery] = useState("");
   const [twentyPickerOpen, setTwentyPickerOpen] = useState(false);
 
   // Pre-fill from the project's linked company (convenience for recurring
@@ -362,22 +361,6 @@ export default function RecordScreen() {
     }
   }, [projects, selectedProjectId, twentyCompany]);
 
-  // Populate the picker as soon as Twenty is in play, so opening it shows the
-  // companies instead of an empty box demanding a search term.
-  useEffect(() => {
-    if (!hasTwenty) return;
-    const query = twentyQuery.trim();
-    const handle = setTimeout(
-      () => {
-        api
-          .searchTwentyCompanies(query)
-          .then(setTwentyCompanies)
-          .catch(() => setTwentyCompanies([]));
-      },
-      query ? 350 : 0,
-    );
-    return () => clearTimeout(handle);
-  }, [twentyQuery, hasTwenty, api]);
   const [contexts, setContexts] = useState<Context[]>([]);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
 
@@ -1145,9 +1128,9 @@ export default function RecordScreen() {
                 />
               </View>
 
-              {/* Twenty needs a destination company, which comes from the
-                  project's link — so this stays disabled until the selected
-                  project is mapped in the web app. */}
+              {/* Twenty needs a destination company. It's picked per meeting —
+                  the same person attends meetings for different clients — and
+                  the project's link only pre-fills it. */}
               {hasTwenty && (
                 <View style={{ marginTop: 12 }}>
                   <View
@@ -1176,6 +1159,18 @@ export default function RecordScreen() {
                       Pick a company or the note will be skipped.
                     </Text>
                   )}
+
+                  {/* Mounted in THIS branch: the button above only exists while
+                      saving, and a picker rendered in another phase's tree is
+                      never mounted when that button is tapped. */}
+                  <TwentyCompanyPicker
+                    visible={twentyPickerOpen}
+                    onDismiss={() => setTwentyPickerOpen(false)}
+                    onSelect={(c) => {
+                      setTwentyCompany(c);
+                      setTwentyPickerOpen(false);
+                    }}
+                  />
                 </View>
               )}
             </View>
@@ -1291,56 +1286,6 @@ export default function RecordScreen() {
             {LANGUAGE_OPTIONS.find((l) => l.code === language)?.name ||
               "Language"}
           </Button>
-
-          {/* Twenty company picker — the destination for THIS meeting's note. */}
-          <Portal>
-            <Modal
-              visible={twentyPickerOpen}
-              onDismiss={() => {
-                setTwentyPickerOpen(false);
-                setTwentyQuery("");
-              }}
-              contentContainerStyle={{
-                backgroundColor: theme.colors.background,
-                padding: 20,
-                margin: 20,
-                borderRadius: 12,
-                maxHeight: "80%",
-              }}
-            >
-              <Text variant="titleMedium" style={{ marginBottom: 12, fontWeight: "bold" }}>
-                Company in Twenty
-              </Text>
-              <TextInput
-                mode="outlined"
-                dense
-                autoFocus
-                placeholder="Search companies…"
-                value={twentyQuery}
-                onChangeText={setTwentyQuery}
-                left={<TextInput.Icon icon="magnify" />}
-              />
-              <ScrollView style={{ marginTop: 12 }} keyboardShouldPersistTaps="handled">
-                {twentyCompanies.length === 0 ? (
-                  <Text style={{ opacity: 0.6, padding: 8 }}>No companies found</Text>
-                ) : (
-                  twentyCompanies.map((c) => (
-                    <List.Item
-                      key={c.id}
-                      title={c.name}
-                      description={c.domainName || undefined}
-                      left={(props) => <List.Icon {...props} icon="office-building" />}
-                      onPress={() => {
-                        setTwentyCompany(c);
-                        setTwentyPickerOpen(false);
-                        setTwentyQuery("");
-                      }}
-                    />
-                  ))
-                )}
-              </ScrollView>
-            </Modal>
-          </Portal>
 
           <Portal>
             <Modal

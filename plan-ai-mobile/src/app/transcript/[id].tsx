@@ -30,11 +30,14 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import MermaidViewer from "../../components/MermaidViewer";
 import { PostMeetingTasksPanel } from "../../components/PostMeetingTasksPanel";
+import { TwentyPushCard } from "../../components/TwentyPushCard";
 import SpeakerInsightsTab, {
   type SpeakerInsight,
 } from "../../components/SpeakerInsightsTab";
 import { Transcript } from "@/services/planAiApi";
 import type { components } from "@/types/api";
+
+type TwentyRef = { noteId?: string; url?: string; role?: "CANONICAL" | "SECONDARY" };
 
 type TranscriptMetadata = components["schemas"]["TranscriptMetadata"];
 
@@ -290,6 +293,16 @@ export default function TranscriptViewScreen() {
           transcriptId={transcript.id}
           tasks={(transcript.metadata as TranscriptMetadata | null)?.postMeetingTasks}
           onAfterRetry={refetchTranscript}
+        />
+
+        {/* Recovery path when the automatic push was skipped or failed —
+            renders itself only when Twenty is connected. */}
+        <TwentyPushCard
+          transcriptId={transcript.id}
+          twenty={
+            (transcript.metadata as (TranscriptMetadata & { twenty?: TwentyRef }) | null)?.twenty
+          }
+          onPushed={refetchTranscript}
         />
       </View>
     );

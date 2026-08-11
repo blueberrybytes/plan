@@ -20,6 +20,8 @@ export type ContextFileResponse    = components['schemas']['ContextFileResponse'
 export type AiModel                = components['schemas']['AiModelResponse'];
 export type UserIntegrationSummary = components['schemas']['IntegrationSummaryResponse'];
 export type TwentyCompanyItem      = components['schemas']['TwentyCompanyItem'];
+export type PushTranscriptToTwentyRequest = components['schemas']['PushTranscriptToTwentyRequest'];
+export type PushTranscriptToTwentyResponse = components['schemas']['PushTranscriptToTwentyResponse'];
 export type DocDocumentResponse    = components['schemas']['DocDocumentResponse'];
 export type UserResponse           = components['schemas']['UserResponse'];
 export type CreateStandaloneTranscriptBody = components['schemas']['CreateStandaloneTranscriptBody'];
@@ -367,6 +369,21 @@ export const createPlanAiApi = (
       return handleResponseWithRetry<{ transcripts: Transcript[] }>(res, () => req(true)).then(
         (d) => d.transcripts,
       );
+    },
+
+    /** Push a processed meeting into Twenty as a note linked to a company. */
+    async pushTranscriptToTwenty(
+      body: PushTranscriptToTwentyRequest,
+    ): Promise<PushTranscriptToTwentyResponse> {
+      const req = async (force: boolean) =>
+        safeFetch(`${BASE_URL}/api/twenty/push-transcript`, {
+          method: "POST",
+          headers: await getAuthHeaders(force),
+          body: JSON.stringify(body),
+        });
+
+      const res = await req(false);
+      return handleResponseWithRetry<PushTranscriptToTwentyResponse>(res, () => req(true));
     },
 
     /** Companies from the connected Twenty CRM, for the post-recording picker. */
