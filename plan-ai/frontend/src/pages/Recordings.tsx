@@ -31,6 +31,7 @@ import {
   useListGlobalTranscriptsQuery,
   useDeleteTranscriptMutation,
 } from "../store/apis/transcriptApi";
+import { useListProjectsQuery } from "../store/apis/projectApi";
 import SidebarLayout from "../components/layout/SidebarLayout";
 import PageHeader from "../components/layout/PageHeader";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,7 @@ const Recordings: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("all_dates");
   const [sentimentFilter, setSentimentFilter] = useState("all_sentiments");
+  const [projectFilter, setProjectFilter] = useState("all_projects");
 
   React.useEffect(() => {
     const handler = setTimeout(() => {
@@ -52,8 +54,22 @@ const Recordings: React.FC = () => {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  const { data: projectsData } = useListProjectsQuery(undefined);
+  const projects = projectsData?.data?.projects ?? [];
+
+  // Every filter is applied SERVER-SIDE. Date and sentiment used to be filtered
+  // on the client, which only ever narrowed the 20 rows of the current page —
+  // so "This Week" could show nothing while matching recordings sat on page 2.
   const { data, isLoading, error, refetch, isFetching } = useListGlobalTranscriptsQuery(
-    { page, pageSize: 20, source: "RECORDING", q: debouncedSearch || undefined },
+    {
+      page,
+      pageSize: 20,
+      source: "RECORDING",
+      q: debouncedSearch || undefined,
+      projectId: projectFilter !== "all_projects" ? projectFilter : undefined,
+      sentiment: sentimentFilter !== "all_sentiments" ? sentimentFilter : undefined,
+      dateFilter: dateFilter !== "all_dates" ? dateFilter : undefined,
+    },
     { refetchOnFocus: true },
   );
 
@@ -89,27 +105,7 @@ const Recordings: React.FC = () => {
     );
   }
 
-  let transcripts = data?.data?.transcripts || [];
-
-  if (sentimentFilter !== "all_sentiments") {
-    transcripts = transcripts.filter(
-      (t: components["schemas"]["StandaloneTranscriptResponse"]) => t.sentiment === sentimentFilter,
-    );
-  }
-
-  if (dateFilter !== "all_dates") {
-    const now = new Date();
-    transcripts = transcripts.filter((t: components["schemas"]["StandaloneTranscriptResponse"]) => {
-      const d = t.recordedAt ? new Date(t.recordedAt) : new Date(t.createdAt);
-      if (dateFilter === "today") {
-        return d.toDateString() === now.toDateString();
-      } else if (dateFilter === "week") {
-        const diff = now.getTime() - d.getTime();
-        return diff <= 7 * 24 * 60 * 60 * 1000; // 7 days
-      }
-      return true;
-    });
-  }
+  const transcripts = data?.data?.transcripts || [];
 
   return (
     <SidebarLayout>
@@ -159,7 +155,10 @@ const Recordings: React.FC = () => {
               select
               size="small"
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                setPage(1);
+              }}
               sx={{ width: 140 }}
             >
               <MenuItem value="all_dates">All Dates</MenuItem>
@@ -170,13 +169,33 @@ const Recordings: React.FC = () => {
               select
               size="small"
               value={sentimentFilter}
-              onChange={(e) => setSentimentFilter(e.target.value)}
+              onChange={(e) => {
+                setSentimentFilter(e.target.value);
+                setPage(1);
+              }}
               sx={{ width: 160 }}
             >
               <MenuItem value="all_sentiments">All Sentiments</MenuItem>
               <MenuItem value="POSITIVE">Positive</MenuItem>
               <MenuItem value="MIXED">Mixed</MenuItem>
               <MenuItem value="NEGATIVE">Negative</MenuItem>
+            </TextField>
+            <TextField
+              select
+              size="small"
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value);
+                setPage(1);
+              }}
+              sx={{ width: 200 }}
+            >
+              <MenuItem value="all_projects">{t("recordings.allProjects")}</MenuItem>
+              {projects.map((p) => (
+                <MenuItem key={p.id} value={p.id}>
+                  {p.title}
+                </MenuItem>
+              ))}
             </TextField>
           </Box>
         </Box>

@@ -181,12 +181,14 @@ export const createPlanAiApi = (
       return handleResponseWithRetry<AiModel[]>(res, () => req(true));
     },
 
-    async listTranscripts(q?: string): Promise<Transcript[]> {
+    async listTranscripts(q?: string, projectId?: string): Promise<Transcript[]> {
       const req = async (force: boolean) => {
         const url = new URL(`${BASE_URL}/api/transcripts`);
         url.searchParams.set("pageSize", "50");
         url.searchParams.set("source", "RECORDING");
         if (q) url.searchParams.set("q", q);
+        // Server-side so it spans every page, not just the 50 loaded here.
+        if (projectId) url.searchParams.set("projectId", projectId);
 
         return safeFetch(url.toString(), {
           headers: await getAuthHeaders(force),

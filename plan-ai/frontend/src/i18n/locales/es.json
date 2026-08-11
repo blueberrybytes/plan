@@ -1263,7 +1263,8 @@
     }
   },
   "recordings": {
-    "subtitle": "Tus grabaciones capturadas y transcripciones independientes."
+    "subtitle": "Tus grabaciones capturadas y transcripciones independientes.",
+    "allProjects": "Todos los proyectos"
   },
   "notFound": {
     "title": "Página no encontrada",

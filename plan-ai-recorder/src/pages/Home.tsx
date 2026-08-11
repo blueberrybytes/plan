@@ -12,6 +12,7 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  Menu,
   MenuItem,
   Select,
   Stack,
@@ -30,6 +31,7 @@ import {
   Check as CheckIcon,
   Close as CloseIcon,
   BugReport as BugIcon,
+  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -117,6 +119,11 @@ const Home: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Project filter for the recordings LIST. Separate from `selectedProjectId`
+  // below, which picks the project a NEW recording will be filed under —
+  // conflating the two would silently change where the next meeting lands.
+  const [listProjectFilter, setListProjectFilter] = useState<string>("");
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -130,7 +137,7 @@ const Home: React.FC = () => {
     if (!silent) setLoading(true);
     if (!silent) setError(null);
     try {
-      const list = await api.listTranscripts(debouncedSearch);
+      const list = await api.listTranscripts(debouncedSearch, listProjectFilter || undefined);
       setTranscripts(list);
     } catch (err) {
       if (!silent) {
@@ -143,7 +150,7 @@ const Home: React.FC = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [token, activeWorkspaceId, debouncedSearch, api]);
+  }, [token, activeWorkspaceId, debouncedSearch, listProjectFilter, api]);
 
   const loadProjects = useCallback(() => {
     if (!api) return;
@@ -509,7 +516,7 @@ const Home: React.FC = () => {
             </Tooltip>
           </Stack>
 
-          <Box sx={{ px: 2, pb: 1.5 }}>
+          <Box sx={{ px: 2, pb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
             <TextField
               size="small"
               fullWidth
@@ -520,6 +527,55 @@ const Home: React.FC = () => {
                 sx: { fontSize: "0.875rem", borderRadius: 2 },
               }}
             />
+            <Tooltip
+              title={
+                listProjectFilter
+                  ? `Filtered: ${projects.find((p) => p.id === listProjectFilter)?.title ?? "project"}`
+                  : "Filter by project"
+              }
+            >
+              <IconButton
+                size="small"
+                onClick={(e) => setFilterMenuAnchor(e.currentTarget)}
+                sx={{
+                  border: "1px solid",
+                  borderColor: listProjectFilter ? "primary.main" : "divider",
+                  borderRadius: 2,
+                  color: listProjectFilter ? "primary.main" : "text.secondary",
+                }}
+              >
+                <FilterListIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={filterMenuAnchor}
+              open={Boolean(filterMenuAnchor)}
+              onClose={() => setFilterMenuAnchor(null)}
+              slotProps={{ paper: { sx: { maxHeight: 320, minWidth: 220 } } }}
+            >
+              <MenuItem
+                selected={!listProjectFilter}
+                onClick={() => {
+                  setListProjectFilter("");
+                  setFilterMenuAnchor(null);
+                }}
+              >
+                All projects
+              </MenuItem>
+              <Divider />
+              {projects.map((p) => (
+                <MenuItem
+                  key={p.id}
+                  selected={listProjectFilter === p.id}
+                  onClick={() => {
+                    setListProjectFilter(p.id);
+                    setFilterMenuAnchor(null);
+                  }}
+                >
+                  {p.title}
+                </MenuItem>
+              ))}
+            </Menu>
           </Box>
 
           <Divider sx={{ opacity: 0.4 }} />

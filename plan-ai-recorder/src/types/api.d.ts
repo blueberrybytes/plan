@@ -6263,6 +6263,7 @@ export interface operations {
                 sentiment?: string;
                 dateFilter?: string;
                 sources?: string;
+                projectId?: string;
             };
             header?: never;
             path?: never;

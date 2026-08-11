@@ -4091,6 +4091,7 @@ export function RegisterRoutes(app: Router,opts?:{multer?:ReturnType<typeof mult
                 sentiment: {"in":"query","name":"sentiment","dataType":"string"},
                 dateFilter: {"in":"query","name":"dateFilter","dataType":"string"},
                 sources: {"in":"query","name":"sources","dataType":"string"},
+                projectId: {"in":"query","name":"projectId","dataType":"string"},
         };
         app.get('/api/transcripts',
             authenticateMiddleware([{"ClientLevel":[]}]),

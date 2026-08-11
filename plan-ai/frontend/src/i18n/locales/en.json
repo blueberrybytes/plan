@@ -1269,7 +1269,8 @@
     }
   },
   "recordings": {
-    "subtitle": "Your captured recordings and standalone transcripts."
+    "subtitle": "Your captured recordings and standalone transcripts.",
+    "allProjects": "All projects"
   },
   "notFound": {
     "title": "Page Not Found",

@@ -221,6 +221,7 @@ export class TranscriptsController extends BaseWorkspaceController {
     @Query() sentiment?: string,
     @Query() dateFilter?: string,
     @Query() sources?: string,
+    @Query() projectId?: string,
   ): Promise<ApiResponse<StandaloneTranscriptListResponse>> {
     const { user, workspaceId } = await this.getAuthorizedWorkspaceAccess(request);
 
@@ -244,6 +245,10 @@ export class TranscriptsController extends BaseWorkspaceController {
       query: q,
       sentiment,
       dateFilter,
+      // Scope to one project. The service already supported this; it just was
+      // never reachable over HTTP, so every client had to filter client-side
+      // (which silently only filtered the current page).
+      projectId,
     };
 
     const result = await transcriptCrudService.listTranscriptsForUser(user.id, options);

@@ -20,14 +20,14 @@ export const transcriptApi = createApi({
         pageSize?: number;
         source?: "UPLOAD" | "RECORDING" | "ZOOM" | "GMEET" | "TEAMS";
         q?: string;
+        /** Scope to one project. Server-side, so it spans every page. */
+        projectId?: string;
+        sentiment?: string;
+        /** "all_dates" | "today" | "week" — applied server-side. */
+        dateFilter?: string;
       }
     >({
-      query: (params: {
-        page?: number;
-        pageSize?: number;
-        source?: "UPLOAD" | "RECORDING" | "ZOOM" | "GMEET" | "TEAMS";
-        q?: string;
-      }) => ({
+      query: (params) => ({
         url: "/api/transcripts",
         params,
       }),
