@@ -344,17 +344,23 @@ const Recording: React.FC = () => {
     }
   }, [projects, selectedProjectId, twentyCompany]);
 
-  // Debounced search — the CRM is a self-hosted instance, don't hammer it.
+  // Load the first companies as soon as Twenty is in play, so the dropdown is
+  // populated on open instead of demanding that the user guess a search term.
+  // Typing then narrows it (debounced — the CRM is a self-hosted instance).
   useEffect(() => {
-    if (!hasTwenty || twentyQuery.trim().length < 2) return;
-    const handle = setTimeout(() => {
-      setIsSearchingCompanies(true);
-      api
-        .searchTwentyCompanies(twentyQuery.trim())
-        .then(setTwentyCompanies)
-        .catch(() => setTwentyCompanies([]))
-        .finally(() => setIsSearchingCompanies(false));
-    }, 350);
+    if (!hasTwenty) return;
+    const query = twentyQuery.trim();
+    const handle = setTimeout(
+      () => {
+        setIsSearchingCompanies(true);
+        api
+          .searchTwentyCompanies(query)
+          .then(setTwentyCompanies)
+          .catch(() => setTwentyCompanies([]))
+          .finally(() => setIsSearchingCompanies(false));
+      },
+      query ? 350 : 0,
+    );
     return () => clearTimeout(handle);
   }, [twentyQuery, hasTwenty, api]);
 
@@ -804,7 +810,10 @@ const Recording: React.FC = () => {
         syncToTrello,
         syncToNotion,
         syncToAsana,
-        syncToTwenty: syncToTwenty && Boolean(twentyCompany),
+        // Send the flag as CHECKED even without a company: the backend then
+        // records a SKIPPED step explaining why, instead of the client
+        // silently dropping it and the user seeing nothing at all.
+        syncToTwenty,
         twentyCompanyId: twentyCompany?.id,
         exportToGoogleDrive,
         exportToOneDrive,
@@ -897,6 +906,13 @@ const Recording: React.FC = () => {
           const onedrive = ints.find((i) => i.provider === "ONEDRIVE" && i.status === "CONNECTED");
           if (onedrive) {
             setExportToOneDrive(true);
+          }
+          // Same rule as Drive/OneDrive: connected means it's wanted. Without a
+          // company chosen the push is a harmless no-op (SKIPPED), and having it
+          // pre-checked is what surfaces the company picker in the first place.
+          const twenty = ints.find((i) => i.provider === "TWENTY" && i.status === "CONNECTED");
+          if (twenty) {
+            setSyncToTwenty(true);
           }
         }).catch(console.error);
       }
@@ -1212,9 +1228,7 @@ const Recording: React.FC = () => {
                       onInputChange={(_, v) => setTwentyQuery(v)}
                       onChange={(_, v) => setTwentyCompany(v)}
                       noOptionsText={
-                        twentyQuery.trim().length < 2
-                          ? 'Type at least 2 characters…'
-                          : 'No companies found'
+                        isSearchingCompanies ? 'Loading…' : 'No companies found'
                       }
                       renderInput={(params) => (
                         <TextField

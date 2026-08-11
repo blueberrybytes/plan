@@ -75,7 +75,9 @@ function statusIcon(status: PostMeetingTaskStatus["status"]) {
 function summaryText(kind: PostMeetingTaskKind, entry: PostMeetingTaskStatus): string {
   if (entry.status === "FAILED") return entry.error || "Failed";
   if (entry.status === "PENDING") return "In progress…";
-  if (entry.status === "SKIPPED") return "Skipped";
+  // The reason is stored on SKIPPED too — it's the actionable part.
+  if (entry.status === "SKIPPED") return entry.error || "Skipped";
+  if (kind === "twenty") return "Note added to CRM";
   if (kind === "notion") return "Transcript exported";
   if (kind === "doc") return "Document ready";
   if (kind === "slides") return "Slides ready";

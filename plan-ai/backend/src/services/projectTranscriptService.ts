@@ -3109,7 +3109,13 @@ ${taskSummaries}`,
    * transcript's `metadata.postMeetingTasks.{kind}`. Best-effort: failures to
    * write status never bubble up — the side effect itself is what matters.
    */
-  private async setPostMeetingTaskStatus(
+  /**
+   * Public so one-off pushes triggered from a controller (e.g. the manual
+   * "Send to Twenty" dialog) record their outcome in the same place the
+   * automatic pipeline does. Without that, a manual push succeeds but the
+   * transcript view shows nothing for it.
+   */
+  public async setPostMeetingTaskStatus(
     transcriptId: string,
     kind: PostMeetingTaskKind,
     update: Omit<PostMeetingTaskStatus, "finishedAt"> & { finishedAt?: string },

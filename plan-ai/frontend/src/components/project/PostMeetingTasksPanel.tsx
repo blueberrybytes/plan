@@ -70,8 +70,11 @@ function statusIcon(status: PostMeetingTaskStatus["status"]) {
 function summaryText(kind: PostMeetingTaskKind, entry: PostMeetingTaskStatus): string {
   if (entry.status === "FAILED") return entry.error || "Failed";
   if (entry.status === "PENDING") return "In progress…";
-  if (entry.status === "SKIPPED") return "Skipped";
+  // The reason is stored on SKIPPED too (e.g. "No Twenty company was chosen"),
+  // and it's the actionable part — surface it instead of a bare "Skipped".
+  if (entry.status === "SKIPPED") return entry.error || "Skipped";
   // OK
+  if (kind === "twenty") return "Note added to CRM";
   if (entry.count !== undefined) {
     const noun = kind === "doc" || kind === "slides" || kind === "notion" ? "" : "tasks";
     if (kind === "notion") return "Transcript exported";

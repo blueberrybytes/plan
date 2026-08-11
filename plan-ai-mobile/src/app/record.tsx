@@ -362,15 +362,20 @@ export default function RecordScreen() {
     }
   }, [projects, selectedProjectId, twentyCompany]);
 
-  // Debounced search against the self-hosted CRM.
+  // Populate the picker as soon as Twenty is in play, so opening it shows the
+  // companies instead of an empty box demanding a search term.
   useEffect(() => {
-    if (!hasTwenty || twentyQuery.trim().length < 2) return;
-    const handle = setTimeout(() => {
-      api
-        .searchTwentyCompanies(twentyQuery.trim())
-        .then(setTwentyCompanies)
-        .catch(() => setTwentyCompanies([]));
-    }, 350);
+    if (!hasTwenty) return;
+    const query = twentyQuery.trim();
+    const handle = setTimeout(
+      () => {
+        api
+          .searchTwentyCompanies(query)
+          .then(setTwentyCompanies)
+          .catch(() => setTwentyCompanies([]));
+      },
+      query ? 350 : 0,
+    );
     return () => clearTimeout(handle);
   }, [twentyQuery, hasTwenty, api]);
   const [contexts, setContexts] = useState<Context[]>([]);
@@ -579,7 +584,10 @@ export default function RecordScreen() {
           if (trello) setHasTrello(true);
           if (notion) setHasNotion(true);
           if (asana) setHasAsana(true);
-          if (twenty) setHasTwenty(true);
+          if (twenty) {
+            setHasTwenty(true);
+            setSyncToTwenty(true);
+          }
           if (googleDrive) {
             setHasGoogleDrive(true);
             setExportToGoogleDrive(true);
@@ -595,7 +603,8 @@ export default function RecordScreen() {
           setSyncToTrello(false);
           setSyncToNotion(false);
           setSyncToAsana(false);
-          setSyncToTwenty(false);
+          // NOT reset: Twenty is an artifact destination like Drive, not
+          // task spam — connected means wanted, and it no-ops without a company.
         })
         .finally(() => {
           setIsLoadingMetadata(false);
@@ -705,7 +714,9 @@ export default function RecordScreen() {
         syncToTrello,
         syncToNotion,
         syncToAsana,
-        syncToTwenty: syncToTwenty && Boolean(twentyCompany),
+        // Checked-but-no-company must still reach the backend so it records a
+        // visible SKIPPED reason rather than the client dropping it silently.
+        syncToTwenty,
         twentyCompanyId: twentyCompany?.id,
         exportToGoogleDrive,
         exportToOneDrive,
@@ -752,7 +763,7 @@ export default function RecordScreen() {
           syncToTrello,
           syncToNotion,
           syncToAsana,
-          syncToTwenty: syncToTwenty && Boolean(twentyCompany),
+          syncToTwenty,
         twentyCompanyId: twentyCompany?.id,
           exportToGoogleDrive,
           exportToOneDrive,
@@ -1310,9 +1321,7 @@ export default function RecordScreen() {
                 left={<TextInput.Icon icon="magnify" />}
               />
               <ScrollView style={{ marginTop: 12 }} keyboardShouldPersistTaps="handled">
-                {twentyQuery.trim().length < 2 ? (
-                  <Text style={{ opacity: 0.6, padding: 8 }}>Type at least 2 characters…</Text>
-                ) : twentyCompanies.length === 0 ? (
+                {twentyCompanies.length === 0 ? (
                   <Text style={{ opacity: 0.6, padding: 8 }}>No companies found</Text>
                 ) : (
                   twentyCompanies.map((c) => (

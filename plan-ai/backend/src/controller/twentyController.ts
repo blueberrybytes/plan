@@ -5,6 +5,7 @@ import type { ApiResponse } from "./controllerTypes";
 import prisma from "../prisma/prismaClient";
 import { Prisma } from "@prisma/client";
 import { twentyIntegrationService } from "../services/twentyIntegrationService";
+import { projectTranscriptService } from "../services/projectTranscriptService";
 import type {
   TwentyManualConnectRequest,
   TwentySummaryResponse,
@@ -109,8 +110,27 @@ export class TwentyController extends BaseWorkspaceController {
         opportunityId: body.opportunityId,
         forceSeparateNote: body.forceSeparateNote,
       });
+
+      // Record it where every other post-meeting step reports, so the
+      // transcript view shows this push like any other. Best-effort: the note
+      // already exists in the CRM, so a bookkeeping failure must not turn a
+      // successful push into an error for the user.
+      await projectTranscriptService
+        .setPostMeetingTaskStatus(transcript.id, "twenty", {
+          status: "OK",
+          url: result.url,
+        })
+        .catch(() => undefined);
+
       return { status: 200, data: result };
     } catch (error) {
+      await projectTranscriptService
+        .setPostMeetingTaskStatus(transcript.id, "twenty", {
+          status: "FAILED",
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .catch(() => undefined);
+
       this.setStatus(400);
       return {
         status: 400,
