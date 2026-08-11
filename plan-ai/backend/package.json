@@ -15,6 +15,7 @@
     "webhook:berry": "env-cmd -f .env ts-node --transpile-only src/scripts/setBerryWebhook.ts",
     "test:plugins": "env-cmd -f .env ts-node --transpile-only src/scripts/testResponseHealing.ts",
     "test:mcp": "env-cmd -f .env ts-node --transpile-only src/scripts/testMcpHttp.ts",
+    "verify:models": "ts-node --transpile-only src/scripts/verifyModelCatalogue.ts",
     "test:reasoning": "env-cmd -f .env ts-node --transpile-only src/scripts/testReasoning.ts",
     "lint": "eslint \"src/**/*.ts\" --max-warnings=0",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",

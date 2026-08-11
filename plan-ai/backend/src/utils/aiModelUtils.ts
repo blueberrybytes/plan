@@ -5,7 +5,14 @@ import prisma from "../prisma/prismaClient";
 import { logger } from "./logger";
 
 export const DEFAULT_AI_MODEL = "google/gemini-2.5-flash";
-export const FAST_AI_MODEL = "google/gemini-2.5-flash";
+
+// FAST is deliberately a rung BELOW the default — it used to be the same model,
+// which made the name a lie and the constant pointless. Flash Lite is the same
+// family (same tokenizer, same json_schema behaviour, same implicit Google
+// caching) at ~$0.10/$0.40 per 1M instead of $0.30/$2.50, and it's what powers
+// chat, context-document processing and the Telegram agent: high volume, low
+// stakes per call, and a bad answer is immediately visible and retryable.
+export const FAST_AI_MODEL = "google/gemini-2.5-flash-lite";
 // ── Per-task model selection ───────────────────────────────────────────────
 // Gemini 2.5 Flash is the cheap + reliable default for structured extraction
 // and prose: ~same cost as minimax but far more dependable on json_schema and
@@ -15,7 +22,21 @@ export const FAST_AI_MODEL = "google/gemini-2.5-flash";
 export const TICKET_MODEL = "google/gemini-2.5-flash"; // task/ticket extraction
 export const DOC_MODEL = "google/gemini-2.5-flash"; // markdown document generation
 export const SLIDE_MODEL = "google/gemini-2.5-flash"; // slide deck generation
-export const DIAGRAM_MODEL = "anthropic/claude-sonnet-4.6"; // Mermaid generation + repair
+// Haiku 4.5 rather than Sonnet: ~$1/$5 per 1M instead of Sonnet 4.6's $3/$15.
+//
+// The original reasoning — Mermaid's grammar is strict, a single error makes the
+// diagram unrenderable — was sound when written, but the economics had drifted
+// badly: at Sonnet prices ONE diagram cost roughly twice as much as processing
+// the entire rest of the meeting. And the safety net has grown since: the
+// frontend runs `repairMermaidSyntax` before every render, with targeted fixes
+// for the failures actually seen in the wild (quotes inside labels, xychart
+// corruption, zero-duration Gantt tasks). A syntax slip is no longer fatal.
+//
+// Haiku keeps the Anthropic lineage that handles strict syntax well, and 200k
+// context is far more than a diagram prompt needs. If diagram quality regresses,
+// this is one constant to move back — measure it with the Mermaid parser rather
+// than by eye (see MODELOS.md).
+export const DIAGRAM_MODEL = "anthropic/claude-haiku-4.5"; // Mermaid generation + repair
 
 // Model used for the "big-context cached" route (e.g. injecting a whole repo).
 // Gemini 2.5 Flash: 1M context (a stripped repo fits), cheap, reliable
@@ -25,13 +46,25 @@ export const DIAGRAM_MODEL = "anthropic/claude-sonnet-4.6"; // Mermaid generatio
 // endpoint and reuse the warm cache instead of bouncing across providers.
 export const CACHED_CONTEXT_MODEL = "google/gemini-2.5-flash";
 // Fallback models used when the primary model fails.
-// IMPORTANT: Every model in this list MUST support json_schema structured
-// output on OpenRouter — we use Output.object() across the entire app and
-// the fallback must be able to handle it too.
+//
+// Two rules, both learned the hard way:
+//
+// 1. Every model here MUST support json_schema structured output on
+//    OpenRouter — we use Output.object() across the entire app, and a fallback
+//    that can't honour a schema turns a recoverable failure into a parse error.
+//
+// 2. They must NOT share a provider with the primary model. The default is
+//    Google; if Google is the reason the primary failed, a Google fallback
+//    fails with it. That's why this list is OpenAI + Anthropic.
+//
+// Context matters more than price here: fallbacks fire rarely, but they fire on
+// the hardest requests. `gpt-4o-mini` was picked as the cheap "gold standard"
+// and capped at 128k — too small for a long meeting with injected context, so
+// it failed exactly when it was needed. Prices verified 2026-08-12.
 export const FALLBACK_MODELS = [
-  "openai/gpt-4o-mini", // gold standard for json_schema, cheap & fast
-  "openai/gpt-4.1-mini", // newer OpenAI, also reliable structured output
-  "anthropic/claude-sonnet-4.6", // confirmed structured output support
+  "openai/gpt-5.6-luna", // 1.05M context, ~$0.20/$1.20 list (currently 50% off)
+  "openai/gpt-5-mini", // 400k, very reliable on json_schema
+  "anthropic/claude-sonnet-5", // different provider again; 1M context
 ];
 
 export class MissingApiKeyError extends Error {

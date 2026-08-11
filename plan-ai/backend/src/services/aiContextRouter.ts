@@ -10,65 +10,181 @@ export interface ModelLimits {
   tags: string[];
 }
 
-// Supported models and their safe max token context limits
+/**
+ * Models a user can pick, and the context budget the router plans against.
+ *
+ * Two invariants, both load-bearing:
+ *
+ * 1. **Every model MUST support `structured_outputs` on OpenRouter.** The whole
+ *    app extracts through `Output.object()`; a model that can't honour a JSON
+ *    schema doesn't fail loudly, it returns prose that fails to parse.
+ *
+ * 2. **`maxTokens` MUST be at or below the model's real context.** This number
+ *    is what decides "inject everything" vs "fall back to RAG" — declaring more
+ *    than the model can take means the router confidently builds a prompt that
+ *    the provider then rejects. MiniMax M2.7 was listed at 1,000,000 against a
+ *    real 204,800 (~5x over) until this was checked against the live catalogue.
+ *
+ * Prices are USD per 1M tokens (input/output), verified against
+ * `https://openrouter.ai/api/v1/models` on 2026-08-12. They move — re-check
+ * with the snippet in MODELOS.md rather than trusting these numbers forever.
+ */
 export const AI_MODEL_LIMITS: Record<string, ModelLimits> = {
-  // 2026 Fleet - High Capacity & Reasoning
-  "google/gemini-3.1-pro-preview": {
-    modelName: "Gemini 3.1 Pro",
-    maxTokens: 1050000,
-    description:
-      "Google's flagship 2026 model. Best for massive datasets, huge codebases, and deep document analysis.",
-    tags: ["High Context", "Reasoning", "Google"],
-  },
-  "anthropic/claude-sonnet-4.6": {
-    modelName: "Claude 4.6 Sonnet",
+  // ── Budget: cheapest that still handle a full meeting + injected context ──
+  "google/gemini-2.5-flash-lite": {
+    modelName: "Gemini 2.5 Flash Lite",
     maxTokens: 1000000,
     description:
-      "Anthropic's latest workhorse. Perfect balance of blinding speed and near-AGI coding & writing capabilities.",
-    tags: ["Balanced", "Coding", "Anthropic"],
+      "The cheapest option that still takes a whole codebase. ~$0.10/$0.40 per 1M tokens — around a quarter the cost of Flash. Best default when volume matters more than nuance.",
+    tags: ["Cheapest", "High Context", "Google"],
   },
-  "anthropic/claude-opus-4.7": {
-    modelName: "Claude 4.7 Opus",
+  "openai/gpt-5.6-luna": {
+    modelName: "GPT-5.6 Luna",
     maxTokens: 1000000,
     description:
-      "Anthropic's most powerful agentic model. Built for long-running multi-step tasks, complex codebases, and end-to-end project orchestration. #2 in Programming.",
-    tags: ["High Reasoning", "Agentic", "Anthropic"],
-  },
-
-  // 2026 Fleet - Fast & Efficient
-  "minimax/minimax-m2.7": {
-    modelName: "MiniMax M2.7",
-    maxTokens: 1000000,
-    description:
-      "MiniMax's latest flagship model. Fast, cost-efficient, and fully supports structured outputs. Great all-rounder for transcription analysis and task extraction.",
-    tags: ["Fast", "Structured Output", "MiniMax"],
+      "Newest OpenAI generation at budget pricing — ~$0.10/$0.60 per 1M tokens with a 1M context. Strong structured output for the money.",
+    tags: ["Cheapest", "High Context", "OpenAI"],
   },
   "google/gemini-2.5-flash": {
     modelName: "Gemini 2.5 Flash",
     maxTokens: 1000000,
     description:
-      "Incredibly fast response times with a massive context window. Ideal for live chat and basic RAG.",
+      "Incredibly fast response times with a massive context window. ~$0.30/$2.50 per 1M tokens. Ideal for live chat and basic RAG.",
     tags: ["Fast", "Chat", "Google"],
+  },
+  "deepseek/deepseek-v3.2": {
+    modelName: "DeepSeek V3.2",
+    maxTokens: 160000,
+    description:
+      "Excellent value from an open-weights lab — ~$0.27/$0.40 per 1M tokens. Cheap output makes it a good fit for long documents and summaries.",
+    tags: ["Cheap Output", "Open Source", "DeepSeek"],
+  },
+
+  // ── Balanced: the sweet spot for most meeting work ────────────────────────
+  "google/gemini-3.1-flash-lite": {
+    modelName: "Gemini 3.1 Flash Lite",
+    maxTokens: 1000000,
+    description:
+      "A generation newer than 2.5 Flash and still cheaper — ~$0.25/$1.50 per 1M tokens with a 1M context. The conservative upgrade.",
+    tags: ["Balanced", "High Context", "Google"],
+  },
+  "z-ai/glm-5.2": {
+    modelName: "GLM-5.2",
+    maxTokens: 1000000,
+    description:
+      "1M context at ~$0.41/$1.27 per 1M tokens. Unusually cheap for its context size — worth a look for repo-scale analysis.",
+    tags: ["Balanced", "High Context", "Z.ai"],
+  },
+  "openai/gpt-5-mini": {
+    modelName: "GPT-5 Mini",
+    maxTokens: 400000,
+    description:
+      "OpenAI's mid-tier at ~$0.25/$2.00 per 1M tokens. Very reliable on JSON schemas; 400k context covers any single meeting.",
+    tags: ["Balanced", "Structured Output", "OpenAI"],
+  },
+  "minimax/minimax-m3": {
+    modelName: "MiniMax M3",
+    maxTokens: 1000000,
+    description:
+      "MiniMax's 1M-context model at ~$0.30/$1.20 per 1M tokens. Replaces M2.7, which advertised a context it did not have.",
+    tags: ["Balanced", "High Context", "MiniMax"],
+  },
+  "anthropic/claude-haiku-4.5": {
+    modelName: "Claude 4.5 Haiku",
+    maxTokens: 200000,
+    description:
+      "Anthropic's fast tier at ~$1/$5 per 1M tokens. Anthropic's writing quality at a fraction of Sonnet's price, with a 200k window.",
+    tags: ["Fast", "Writing", "Anthropic"],
+  },
+
+  // ── Strong: pick these when the output quality is what matters ────────────
+  "anthropic/claude-sonnet-5": {
+    modelName: "Claude 5 Sonnet",
+    maxTokens: 1000000,
+    description:
+      "Newer and cheaper than 4.6 — ~$2/$10 per 1M tokens for the same 1M context. The default choice for diagrams, specs and anything a client reads.",
+    tags: ["Balanced", "Coding", "Anthropic"],
+  },
+  "anthropic/claude-sonnet-4.6": {
+    modelName: "Claude 4.6 Sonnet",
+    maxTokens: 1000000,
+    description:
+      "The previous Sonnet generation at ~$3/$15 per 1M tokens. Kept for continuity; Sonnet 5 does the same job for less.",
+    tags: ["Balanced", "Coding", "Anthropic"],
+  },
+  "google/gemini-3.1-pro-preview": {
+    modelName: "Gemini 3.1 Pro",
+    maxTokens: 1000000,
+    description:
+      "Google's flagship 2026 model at ~$2/$12 per 1M tokens. Best for massive datasets, huge codebases, and deep document analysis.",
+    tags: ["High Context", "Reasoning", "Google"],
+  },
+  "x-ai/grok-4.5": {
+    modelName: "Grok 4.5",
+    maxTokens: 500000,
+    description:
+      "xAI's flagship at ~$2/$6 per 1M tokens — notably cheap output for its tier, with a 500k window.",
+    tags: ["Reasoning", "Cheap Output", "xAI"],
+  },
+  "qwen/qwen3-max": {
+    modelName: "Qwen3 Max",
+    maxTokens: 260000,
+    description:
+      "Alibaba's flagship at ~$0.78/$3.90 per 1M tokens. Strong multilingual performance — worth testing if your meetings aren't in English.",
+    tags: ["Multilingual", "Reasoning", "Qwen"],
+  },
+  "openai/gpt-5.4": {
+    modelName: "GPT-5.4",
+    maxTokens: 1000000,
+    description:
+      "OpenAI's 1M-context workhorse at ~$2.50/$15 per 1M tokens. Reliable across the board when budget isn't the constraint.",
+    tags: ["Frontier", "High Context", "OpenAI"],
+  },
+
+  // ── Frontier: expensive, for when nothing else is good enough ─────────────
+  "anthropic/claude-opus-5": {
+    modelName: "Claude 5 Opus",
+    maxTokens: 1000000,
+    description:
+      "Anthropic's most capable model — ~$5/$25 per 1M tokens. For long multi-step reasoning where a mistake costs more than the tokens.",
+    tags: ["High Reasoning", "Agentic", "Anthropic"],
+  },
+  "anthropic/claude-opus-4.7": {
+    modelName: "Claude 4.7 Opus",
+    maxTokens: 1000000,
+    description:
+      "The previous Opus generation, same ~$5/$25 pricing. Built for long-running multi-step tasks and end-to-end project orchestration.",
+    tags: ["High Reasoning", "Agentic", "Anthropic"],
   },
   "openai/gpt-5.5": {
     modelName: "GPT-5.5",
-    maxTokens: 1050000,
+    maxTokens: 1000000,
     description:
-      "OpenAI's frontier model with 1M+ context, strong reasoning and high reliability. Excellent cache hit rate makes it cost-efficient for repeated context.",
+      "OpenAI's frontier model at ~$5/$30 per 1M tokens, with 1M context and a strong cache hit rate on repeated context.",
     tags: ["Frontier", "High Context", "OpenAI"],
   },
+  "moonshotai/kimi-k3": {
+    modelName: "Kimi K3",
+    maxTokens: 1000000,
+    description:
+      "Moonshot's frontier model, ~$3/$15 per 1M tokens with a 1M context. Priced like Sonnet 4.6 — a quality choice, not a cost saving.",
+    tags: ["Frontier", "High Context", "Moonshot"],
+  },
+
+  // ── Open weights ──────────────────────────────────────────────────────────
   "deepseek/deepseek-r1": {
     modelName: "DeepSeek R1",
-    maxTokens: 64000,
+    maxTokens: 160000,
     description:
-      "DeepSeek's frontier reasoning model. Specialized in chain-of-thought logic and system architecture.",
+      "DeepSeek's reasoning model, ~$0.70/$2.50 per 1M tokens. Specialised in chain-of-thought logic and system architecture.",
     tags: ["Reasoning", "Open Source", "DeepSeek"],
   },
   "meta-llama/llama-3.3-70b-instruct": {
-    modelName: "Llama 3.3 70B (Groq)",
-    maxTokens: 128000,
-    description: "Meta's flagship open LLM, optimized for instruction following and general tasks.",
-    tags: ["Open Source", "Meta", "Groq"],
+    modelName: "Llama 3.3 70B",
+    maxTokens: 130000,
+    description:
+      "Meta's open LLM at ~$0.10/$0.32 per 1M tokens, optimised for instruction following and general tasks.",
+    tags: ["Open Source", "Meta", "Cheapest"],
   },
 };
 

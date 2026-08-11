@@ -135,7 +135,7 @@ class DiagramGenerationService {
           workspaceId,
           feature: "DIAGRAM",
           provider: "openrouter",
-          model: getConfiguredModel(DIAGRAM_MODEL).modelId || "anthropic/claude-sonnet-4.6",
+          model: getConfiguredModel(DIAGRAM_MODEL).modelId || DIAGRAM_MODEL,
           inputTokens: usageData.inputTokens || 0,
           outputTokens: usageData.outputTokens || 0,
         });
@@ -241,7 +241,7 @@ ${transcriptContent ? `## Source Transcripts\n${transcriptContent}` : ""}`;
           workspaceId,
           feature: "DIAGRAM",
           provider: "openrouter",
-          model: getConfiguredModel(DIAGRAM_MODEL).modelId || "anthropic/claude-sonnet-4.6",
+          model: getConfiguredModel(DIAGRAM_MODEL).modelId || DIAGRAM_MODEL,
           inputTokens: usageData.inputTokens || 0,
           outputTokens: usageData.outputTokens || 0,
         });
