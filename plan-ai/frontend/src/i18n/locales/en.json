@@ -742,7 +742,13 @@
       "regenerate": "Update digest",
       "view": "View digest",
       "started": "Generating project digest… it'll appear shortly.",
-      "error": "Could not generate the digest. Try again."
+      "error": "Couldn't update the digest.",
+      "bannerReady": "Everything decided, pending and at risk across this project's meetings.",
+      "bannerEmpty": "Generate a living synthesis of every meeting: decisions, open action items and next steps.",
+      "updatedAt": "Updated {{date}}",
+      "meetingCount": "{{count}} meetings",
+      "autoUpdates": "updates automatically after each meeting",
+      "success": "Digest updated."
     },
     "chat": {
       "cta": "Ask about meetings",
@@ -755,6 +761,33 @@
       "thinking": "Thinking…",
       "error": "Something went wrong. Please try again.",
       "emptyResponse": "I couldn't generate an answer."
+    },
+    "saved": {
+      "title": "Quick answers",
+      "catchUp": {
+        "label": "Catch me up",
+        "prompt": "Catch me up on this project: what has happened across these meetings, where do we stand right now, and what changed most recently?"
+      },
+      "pending": {
+        "label": "What's pending",
+        "prompt": "List every open action item and commitment from these meetings that is still outstanding. Include who owns each one and flag anything that looks overdue or blocked."
+      },
+      "decisions": {
+        "label": "Decisions taken",
+        "prompt": "List the concrete decisions agreed across these meetings. For each one, say which meeting it came from and what the reasoning was."
+      },
+      "risks": {
+        "label": "Risks & blockers",
+        "prompt": "What risks, blockers, concerns or points of friction have come up across these meetings? Include anything a client complained about or pushed back on."
+      },
+      "nextMeeting": {
+        "label": "Prep next meeting",
+        "prompt": "Prepare me for the next meeting on this project: what was decided last time, what we promised and haven't delivered, what is still open, and which questions I should ask."
+      },
+      "promises": {
+        "label": "What we promised",
+        "prompt": "What have we promised or committed to the client across these meetings? Flag anything that was promised but doesn't appear to have been delivered yet."
+      }
     }
   },
   "projectInfo": {

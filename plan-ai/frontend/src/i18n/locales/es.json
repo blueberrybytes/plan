@@ -736,7 +736,13 @@
       "regenerate": "Actualizar resumen",
       "view": "Ver resumen",
       "started": "Generando el resumen del proyecto… aparecerá en breve.",
-      "error": "No se pudo generar el resumen. Inténtalo de nuevo."
+      "error": "No se pudo actualizar el digest.",
+      "bannerReady": "Todo lo decidido, pendiente y en riesgo de las reuniones de este proyecto.",
+      "bannerEmpty": "Genera una síntesis viva de todas las reuniones: decisiones, pendientes y próximos pasos.",
+      "updatedAt": "Actualizado {{date}}",
+      "meetingCount": "{{count}} reuniones",
+      "autoUpdates": "se actualiza automáticamente tras cada reunión",
+      "success": "Digest actualizado."
     },
     "chat": {
       "cta": "Preguntar sobre los meetings",
@@ -749,6 +755,33 @@
       "thinking": "Pensando…",
       "error": "Algo ha fallado. Inténtalo de nuevo.",
       "emptyResponse": "No he podido generar una respuesta."
+    },
+    "saved": {
+      "title": "Respuestas rápidas",
+      "catchUp": {
+        "label": "Ponme al día",
+        "prompt": "Ponme al día de este proyecto: qué ha pasado en estas reuniones, dónde estamos ahora mismo y qué ha cambiado más recientemente."
+      },
+      "pending": {
+        "label": "Qué está pendiente",
+        "prompt": "Lista todos los action items y compromisos de estas reuniones que sigan pendientes. Indica quién es responsable de cada uno y señala lo que parezca vencido o bloqueado."
+      },
+      "decisions": {
+        "label": "Decisiones tomadas",
+        "prompt": "Lista las decisiones concretas acordadas en estas reuniones. Para cada una, di de qué reunión salió y cuál fue el razonamiento."
+      },
+      "risks": {
+        "label": "Riesgos y bloqueos",
+        "prompt": "¿Qué riesgos, bloqueos, preocupaciones o puntos de fricción han surgido en estas reuniones? Incluye cualquier queja u objeción del cliente."
+      },
+      "nextMeeting": {
+        "label": "Prepara la próxima",
+        "prompt": "Prepárame la próxima reunión de este proyecto: qué se decidió la última vez, qué prometimos y no hemos entregado, qué sigue abierto y qué preguntas debería hacer."
+      },
+      "promises": {
+        "label": "Qué prometimos",
+        "prompt": "¿Qué hemos prometido o comprometido al cliente en estas reuniones? Señala lo que se prometió y no parece haberse entregado todavía."
+      }
     }
   },
   "projectInfo": {

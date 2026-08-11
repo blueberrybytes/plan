@@ -24,6 +24,8 @@ import { githubContextWorker } from "./workers/githubContextWorker";
 import { githubContextQueue } from "./queue/githubContextQueue";
 import { pricingSyncWorker } from "./workers/pricingSyncWorker";
 import { pricingSyncQueue } from "./queue/pricingSyncQueue";
+import { weeklyDigestWorker } from "./workers/weeklyDigestWorker";
+import { weeklyDigestQueue } from "./queue/weeklyDigestQueue";
 import { transcriptGenerationWorker } from "./workers/transcriptGenerationWorker";
 import { transcriptGenerationQueue } from "./queue/transcriptGenerationQueue";
 import { taskRefinementWorker } from "./workers/taskRefinementWorker";
@@ -197,6 +199,7 @@ createBullBoard({
     new BullMQAdapter(transcriptGenerationQueue),
     new BullMQAdapter(taskRefinementQueue),
     new BullMQAdapter(contextDocumentQueue),
+    new BullMQAdapter(weeklyDigestQueue),
   ],
   serverAdapter: serverAdapter,
 });
@@ -314,6 +317,20 @@ const startServer = async () => {
     logger.error("Failed to schedule pricing sync job", error);
   }
 
+  try {
+    // Mondays at 08:00 server time. `jobId` is fixed so restarting the server
+    // re-uses the same repeatable job instead of stacking a new schedule on
+    // every deploy (which would send the digest N times).
+    const digestJob = await weeklyDigestQueue.add(
+      "weekly-digest",
+      {},
+      { repeat: { pattern: "0 8 * * 1" }, jobId: "weekly-digest-cron" },
+    );
+    logger.info(`Scheduled weekly digest job: ${digestJob.id}`);
+  } catch (error) {
+    logger.error("Failed to schedule weekly digest job", error);
+  }
+
   // Initialize in-memory pricing cache
   await pricingCacheService.init();
 
@@ -344,6 +361,7 @@ const closeServer = async (cb?: () => void) => {
   await transcriptGenerationWorker.close();
   await taskRefinementWorker.close();
   await contextDocumentWorker.close();
+  await weeklyDigestWorker.close();
   pricingCacheService.close();
 
   if (server) {

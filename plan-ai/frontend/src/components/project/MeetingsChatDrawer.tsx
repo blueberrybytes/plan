@@ -25,6 +25,12 @@ interface MeetingsChatDrawerProps {
   onClose: () => void;
   projectId: string;
   meetings: Meeting[];
+  /**
+   * Question to ask automatically when the drawer opens (the saved-question
+   * buttons in MeetingsTab). Fires once per open, so reopening with the same
+   * preset asks again but re-rendering doesn't.
+   */
+  initialQuestion?: string;
 }
 
 interface LocalMessage {
@@ -72,6 +78,7 @@ const MeetingsChatDrawer: React.FC<MeetingsChatDrawerProps> = ({
   onClose,
   projectId,
   meetings,
+  initialQuestion,
 }) => {
   const { t } = useTranslation();
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -85,36 +92,56 @@ const MeetingsChatDrawer: React.FC<MeetingsChatDrawerProps> = ({
     }
   }, [messages, isLoading]);
 
+  const ask = React.useCallback(
+    async (question: string, history: LocalMessage[]) => {
+      setMessages((prev) => [...prev, { role: "user", content: question }]);
+      try {
+        const response = await sendLiveChatMessage({
+          content: question,
+          liveTranscript: buildMeetingsContext(meetings, t("meetings.untitled", "Untitled meeting")),
+          projectIds: [projectId],
+          history,
+        }).unwrap();
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: response || t("meetings.chat.emptyResponse", "I couldn't generate an answer."),
+          },
+        ]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: t("meetings.chat.error", "Something went wrong. Please try again."),
+          },
+        ]);
+      }
+    },
+    [meetings, projectId, sendLiveChatMessage, t],
+  );
+
+  // Fire the preset question once per open. Guarded by a ref rather than the
+  // messages array so a user who opens a preset, clears nothing and scrolls
+  // doesn't re-trigger it.
+  const firedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      firedFor.current = null;
+      return;
+    }
+    if (!initialQuestion || firedFor.current === initialQuestion) return;
+    firedFor.current = initialQuestion;
+    setMessages([]);
+    void ask(initialQuestion, []);
+  }, [open, initialQuestion, ask]);
+
   const handleSend = async () => {
     const question = input.trim();
     if (!question || isLoading) return;
     setInput("");
-    const history = messages;
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
-
-    try {
-      const response = await sendLiveChatMessage({
-        content: question,
-        liveTranscript: buildMeetingsContext(meetings, t("meetings.untitled", "Untitled meeting")),
-        projectIds: [projectId],
-        history,
-      }).unwrap();
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: response || t("meetings.chat.emptyResponse", "I couldn't generate an answer."),
-        },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: t("meetings.chat.error", "Something went wrong. Please try again."),
-        },
-      ]);
-    }
+    await ask(question, messages);
   };
 
   return (

@@ -20,13 +20,7 @@ import SlideshowOutlinedIcon from "@mui/icons-material/SlideshowOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { useTranslation } from "react-i18next";
-import { useDispatch } from "react-redux";
-import { setToastMessage } from "../../store/slices/app/appSlice";
-import {
-  useGetProjectQuery,
-  useListProjectTranscriptsQuery,
-  useGenerateProjectDigestMutation,
-} from "../../store/apis/projectApi";
+import { useListProjectTranscriptsQuery } from "../../store/apis/projectApi";
 import MeetingsChatDrawer from "./MeetingsChatDrawer";
 
 interface MeetingsTabProps {
@@ -40,6 +34,63 @@ const MEETING_TYPE_LABELS: Record<string, string> = {
   decision: "Decision / Strategy",
   client: "Client",
 };
+
+/**
+ * The questions teams actually ask every week, as one-click chips. The chat
+ * already answers all of these — but a blank input gets ignored, so the value
+ * here is purely that the user no longer has to think of the question.
+ * `label` is the chip; `prompt` is what actually gets sent.
+ */
+const SAVED_QUESTIONS = [
+  {
+    key: "catchUp",
+    labelKey: "meetings.saved.catchUp.label",
+    labelFallback: "Catch me up",
+    promptKey: "meetings.saved.catchUp.prompt",
+    promptFallback:
+      "Catch me up on this project: what has happened across these meetings, where do we stand right now, and what changed most recently?",
+  },
+  {
+    key: "pending",
+    labelKey: "meetings.saved.pending.label",
+    labelFallback: "What's pending",
+    promptKey: "meetings.saved.pending.prompt",
+    promptFallback:
+      "List every open action item and commitment from these meetings that is still outstanding. Include who owns each one and flag anything that looks overdue or blocked.",
+  },
+  {
+    key: "decisions",
+    labelKey: "meetings.saved.decisions.label",
+    labelFallback: "Decisions taken",
+    promptKey: "meetings.saved.decisions.prompt",
+    promptFallback:
+      "List the concrete decisions agreed across these meetings. For each one, say which meeting it came from and what the reasoning was.",
+  },
+  {
+    key: "risks",
+    labelKey: "meetings.saved.risks.label",
+    labelFallback: "Risks & blockers",
+    promptKey: "meetings.saved.risks.prompt",
+    promptFallback:
+      "What risks, blockers, concerns or points of friction have come up across these meetings? Include anything a client complained about or pushed back on.",
+  },
+  {
+    key: "nextMeeting",
+    labelKey: "meetings.saved.nextMeeting.label",
+    labelFallback: "Prep next meeting",
+    promptKey: "meetings.saved.nextMeeting.prompt",
+    promptFallback:
+      "Prepare me for the next meeting on this project: what was decided last time, what we promised and haven't delivered, what is still open, and which questions I should ask.",
+  },
+  {
+    key: "promises",
+    labelKey: "meetings.saved.promises.label",
+    labelFallback: "What we promised",
+    promptKey: "meetings.saved.promises.prompt",
+    promptFallback:
+      "What have we promised or committed to the client across these meetings? Flag anything that was promised but doesn't appear to have been delivered yet.",
+  },
+] as const;
 
 /** Output chips derived from a transcript's postMeetingTasks metadata. */
 const OutputChips: React.FC<{ metadata: Record<string, unknown> | null }> = ({ metadata }) => {
@@ -82,82 +133,47 @@ const OutputChips: React.FC<{ metadata: Record<string, unknown> | null }> = ({ m
 const MeetingsTab: React.FC<MeetingsTabProps> = ({ projectId }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
 
-  const { data: projectData } = useGetProjectQuery(projectId, { skip: !projectId });
   const { data: transcriptsData, isLoading } = useListProjectTranscriptsQuery(
     { projectId, params: undefined },
     { skip: !projectId },
   );
-  const [generateDigest, { isLoading: isGenerating }] = useGenerateProjectDigestMutation();
 
   const meetings = transcriptsData?.data?.transcripts ?? [];
-  const digestDocId = (projectData?.data?.metadata as { digestDocId?: string } | null)?.digestDocId;
   const [chatOpen, setChatOpen] = React.useState(false);
-
-  const handleGenerateDigest = async () => {
-    try {
-      await generateDigest(projectId).unwrap();
-      dispatch(
-        setToastMessage({
-          message: t("meetings.digest.started", "Generating project digest… it'll appear shortly."),
-          severity: "success",
-        }),
-      );
-    } catch {
-      dispatch(
-        setToastMessage({
-          message: t("meetings.digest.error", "Could not generate the digest. Try again."),
-          severity: "error",
-        }),
-      );
-    }
-  };
+  const [presetQuestion, setPresetQuestion] = React.useState<string | undefined>(undefined);
 
   return (
     <Stack spacing={3}>
-      {/* Project Digest — cross-meeting synthesis */}
-      <Card variant="outlined" sx={{ borderColor: "primary.main" }}>
-        <CardContent>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <AutoAwesomeIcon color="primary" />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              {t("meetings.digest.title", "Project Digest")}
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t(
-              "meetings.digest.subtitle",
-              "A living synthesis of all meetings: decisions, open action items, recurring themes and next steps. Confidential meetings are excluded.",
-            )}
+      {/* The Project Digest card used to live here. It now sits above the tabs
+          (ProjectDigestBanner) so it's the first thing seen when opening a
+          project, instead of being buried two clicks deep in this tab. */}
+
+      {/* Saved questions — the questions a team actually asks every week.
+          An empty chat box gets ignored; a row of concrete questions gets used.
+          These run against the same meetings context as the free-form chat. */}
+      {meetings.length > 0 && (
+        <Box>
+          <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+            {t("meetings.saved.title", "Quick answers")}
           </Typography>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Button
-              variant="contained"
-              startIcon={
-                isGenerating ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />
-              }
-              onClick={handleGenerateDigest}
-              disabled={isGenerating || meetings.length === 0}
-            >
-              {digestDocId
-                ? t("meetings.digest.regenerate", "Update digest")
-                : t("meetings.digest.generate", "Generate digest")}
-            </Button>
-            {digestDocId && (
-              <Button variant="outlined" component={RouterLink} to={`/docs/view/${digestDocId}`}>
-                {t("meetings.digest.view", "View digest")}
-              </Button>
-            )}
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            {SAVED_QUESTIONS.map((q) => (
+              <Chip
+                key={q.key}
+                icon={<AutoAwesomeIcon fontSize="small" />}
+                label={t(q.labelKey, q.labelFallback)}
+                onClick={() => {
+                  setPresetQuestion(t(q.promptKey, q.promptFallback));
+                  setChatOpen(true);
+                }}
+                variant="outlined"
+                sx={{ cursor: "pointer" }}
+              />
+            ))}
           </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
-            {t(
-              "meetings.contextActive",
-              "The project's context (files, knowledge base) feeds every meeting automatically.",
-            )}
-          </Typography>
-        </CardContent>
-      </Card>
+        </Box>
+      )}
 
       <Divider />
 
@@ -170,7 +186,10 @@ const MeetingsTab: React.FC<MeetingsTabProps> = ({ projectId }) => {
           variant="outlined"
           size="small"
           startIcon={<QuestionAnswerOutlinedIcon />}
-          onClick={() => setChatOpen(true)}
+          onClick={() => {
+            setPresetQuestion(undefined);
+            setChatOpen(true);
+          }}
           disabled={meetings.length === 0}
         >
           {t("meetings.chat.cta", "Ask about meetings")}
@@ -256,6 +275,7 @@ const MeetingsTab: React.FC<MeetingsTabProps> = ({ projectId }) => {
         onClose={() => setChatOpen(false)}
         projectId={projectId}
         meetings={meetings}
+        initialQuestion={presetQuestion}
       />
     </Stack>
   );

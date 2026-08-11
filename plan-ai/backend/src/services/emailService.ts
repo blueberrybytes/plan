@@ -1,5 +1,10 @@
-import { renderWorkspaceInvitationEmail, renderTelegramLeadEmail } from "./templates";
+import {
+  renderWorkspaceInvitationEmail,
+  renderTelegramLeadEmail,
+  renderWeeklyDigestEmail,
+} from "./templates";
 import type { TelegramLeadEmailInput } from "./templates/telegramLead";
+import type { WeeklyDigestEmailInput } from "./templates/weeklyDigest";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "Plan AI <noreply@plan-ai.blueberrybytes.com>";
@@ -87,5 +92,41 @@ export async function sendTelegramLeadEmail(input: TelegramLeadEmailInput): Prom
     console.log(`[EMAIL] Lead notification sent for ${input.handle}`);
   } catch (err) {
     console.error("[EMAIL] Lead notification threw", err);
+  }
+}
+
+/**
+ * Monday-morning weekly digest. Throws on failure so the caller
+ * (`runWeeklyDigest`) can count it as failed and log which user it was —
+ * the batch keeps going regardless.
+ */
+export async function sendWeeklyDigestEmail(
+  to: string,
+  input: WeeklyDigestEmailInput,
+): Promise<void> {
+  if (!RESEND_API_KEY) {
+    console.warn(`[EMAIL] RESEND_API_KEY not set. Skipping weekly digest to ${to}`);
+    return;
+  }
+
+  const count = input.digest.meetings.length;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `Your week: ${count} meeting${count === 1 ? "" : "s"} in ${input.workspaceName}`,
+      html: renderWeeklyDigestEmail(input),
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Weekly digest email failed ${response.status}: ${body}`);
   }
 }

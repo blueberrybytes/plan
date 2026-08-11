@@ -80,9 +80,14 @@ ${meetingBlocks}`;
     themeId: project.themeId ?? undefined,
   });
 
-  // Persist the digest doc id so the UI can find/regenerate it.
+  // Persist the digest doc id so the UI can find/regenerate it, plus when it
+  // last ran and over how many meetings — the UI surfaces this so a reader can
+  // tell at a glance whether the digest is current (it regenerates after every
+  // meeting, but nobody believes that without a timestamp).
   const meta = (project.metadata as Record<string, unknown> | null) ?? {};
   meta.digestDocId = doc.id;
+  meta.digestGeneratedAt = new Date().toISOString();
+  meta.digestMeetingCount = meetings.length;
   await prisma.project.update({
     where: { id: projectId },
     data: { metadata: meta as Prisma.InputJsonObject },

@@ -44,6 +44,7 @@ import MeetingsTab from "../components/project/MeetingsTab";
 import ProjectFilesTab from "../components/project/ProjectFilesTab";
 import ProjectKeywordsTab from "../components/project/ProjectKeywordsTab";
 import AssistantChatPanel from "../components/chat/AssistantChatPanel";
+import ProjectDigestBanner from "../components/project/ProjectDigestBanner";
 import ProjectTaskDependencyDiagram from "../components/project/ProjectTaskDependencyDiagram";
 import ProjectTaskGantt from "../components/project/ProjectTaskGantt";
 import ProjectExportDialog, { type ExportFormat } from "../components/project/ProjectExportDialog";
@@ -593,6 +594,10 @@ const ProjectDetails: React.FC = () => {
                     </Stack>
 
                     <Divider />
+
+                    {/* The digest is the single most useful artifact in a
+                        project — it belongs above the tabs, not inside one. */}
+                    {projectId && <ProjectDigestBanner projectId={projectId} />}
 
                     <Tabs
                       value={activeTab}
