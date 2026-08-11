@@ -104,6 +104,8 @@ export interface TwentyNoteRef {
    * the upload failed — the note is still valid, so this is not an error state.
    */
   attachmentId?: string;
+  /** Timeline entry on the company, stamped at the real meeting time. */
+  timelineActivityId?: string;
   syncedAt?: string;
 }
 

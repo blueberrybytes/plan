@@ -58,6 +58,19 @@ const TWENTY_TEXT_DOCUMENT_CATEGORY = "TEXT_DOCUMENT";
  */
 const attachmentFileFieldIds = new Map<string, string>();
 
+/**
+ * Timeline event name, following Twenty's own `<object>.<verb>` convention
+ * (`company.created`, `opportunity.updated`).
+ *
+ * Why write this at all when the note already lands on the company: a note is
+ * stamped when we PUSH it, which can be hours after the meeting, so the CRM
+ * timeline tells the wrong story. A timeline activity carries its own
+ * `happensAt`, so the meeting sits where it actually happened. Verified against
+ * a live instance (2026-08): notes created through the API generate no timeline
+ * activity of their own, so this adds an entry rather than duplicating one.
+ */
+const TWENTY_MEETING_EVENT = "meeting.recorded";
+
 // ── meeting identity tuning ────────────────────────────────────────────────
 /** Client clocks drift; widen both intervals before comparing. */
 const CLOCK_SKEW_MS = 10 * 60 * 1000;
@@ -559,6 +572,62 @@ class TwentyIntegrationService {
     return { attachmentId, filename };
   }
 
+  /**
+   * Put the meeting on the company's timeline at the time it actually happened.
+   *
+   * `properties` is free-form JSON, so it carries a human-readable summary of
+   * the meeting — worth filling in because a custom event name is not one Twenty
+   * knows how to render specially, and these values are what remains legible.
+   *
+   * Links through `targetCompanyId`: timelineActivity exposes MORPH_RELATION
+   * targets, so plain `companyId` is rejected — same as noteTarget and
+   * attachment.
+   */
+  public async recordMeetingOnTimeline(
+    baseUrl: string,
+    apiKey: string,
+    args: {
+      transcript: Transcript;
+      companyId: string;
+      happensAt: Date;
+      noteId?: string;
+    },
+  ): Promise<string> {
+    const { transcript } = args;
+    const metadata = (transcript.metadata ?? null) as TranscriptMetadata | null;
+    const speakers: SpeakerInsight[] = metadata?.speakers ?? [];
+
+    const properties: Record<string, unknown> = {
+      title: transcript.title?.trim() || "Reunión",
+      source: "Plan AI",
+    };
+    if (transcript.durationSeconds) {
+      properties.duration = `${Math.round(transcript.durationSeconds / 60)} min`;
+    }
+    if (speakers.length > 0) {
+      properties.attendees = speakers
+        .map((s) => s.identifiedName?.trim() || s.label)
+        .filter(Boolean)
+        .join(", ");
+    }
+    if (args.noteId) properties.noteId = args.noteId;
+
+    const created = await this.fetchTwenty<unknown>(baseUrl, apiKey, "/timelineActivities", {
+      method: "POST",
+      body: JSON.stringify({
+        name: TWENTY_MEETING_EVENT,
+        happensAt: args.happensAt.toISOString(),
+        properties,
+        targetCompanyId: args.companyId,
+      }),
+    });
+
+    const activity = this.unwrap<Record<string, unknown>>(created, "createTimelineActivity");
+    const activityId = String(activity?.id ?? "");
+    if (!activityId) throw new Error("Twenty did not return a timeline activity id");
+    return activityId;
+  }
+
   private async createNoteWithTargets(
     baseUrl: string,
     apiKey: string,
@@ -729,11 +798,34 @@ class TwentyIntegrationService {
             );
           }
 
+          // Stamp the company's timeline at the real meeting time. Same
+          // canonical-only, non-fatal treatment as the attachment.
+          let timelineActivityId: string | undefined;
+          try {
+            timelineActivityId = await this.recordMeetingOnTimeline(
+              integration.baseUrl,
+              integration.apiKey,
+              {
+                transcript,
+                companyId: args.companyId,
+                happensAt: interval.startedAt,
+                noteId: note.noteId,
+              },
+            );
+          } catch (timelineError) {
+            logger.error(
+              `[twenty] note ${note.noteId} created but the timeline entry could not be recorded`,
+              timelineError,
+              { noteId: note.noteId, companyId: args.companyId, transcriptId: transcript.id },
+            );
+          }
+
           await this.markTranscript(transcript.id, metadata, {
             noteId: note.noteId,
             url: note.url,
             role: "CANONICAL",
             attachmentId,
+            timelineActivityId,
             syncedAt: new Date().toISOString(),
           });
 
