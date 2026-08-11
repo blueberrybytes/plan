@@ -280,6 +280,60 @@ describe("pushMeetingNote", () => {
       twentyIntegrationService.pushMeetingNote("ws-1", transcript(), { companyId: "co-uriach" }),
     ).rejects.toThrow(/not connected/i);
   });
+
+  /**
+   * A note that exists but is linked to nothing is INVISIBLE in the client's
+   * CRM — it appears on no timeline. Reporting that as success is the worst
+   * possible outcome: the user believes it landed and nobody ever finds out.
+   */
+  it("throws instead of reporting success when every link fails", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes("/noteTargets")) {
+        return Promise.resolve({ ok: false, status: 400, text: () => Promise.resolve("bad target") });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: { createNote: { id: "note-orphan" } } }),
+      });
+    });
+    db.meetingCrmNote.create.mockResolvedValue({ id: "claim-1" });
+
+    await expect(
+      twentyIntegrationService.pushMeetingNote("ws-1", transcript(), {
+        companyId: "co-uriach",
+        personIds: ["p-david"],
+      }),
+    ).rejects.toThrow(/could not be linked/i);
+  });
+
+  it("still succeeds when only SOME links fail (the note is reachable)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      (url: string, init?: { body?: string }) => {
+        if (url.includes("/noteTargets")) {
+          // The company link lands; the person link fails.
+          const failed = init?.body?.includes("personId");
+          return failed
+            ? Promise.resolve({ ok: false, status: 400, text: () => Promise.resolve("no person") })
+            : Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: {} }) });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: { createNote: { id: "note-1" } } }),
+        });
+      },
+    );
+    db.meetingCrmNote.create.mockResolvedValue({ id: "claim-1" });
+
+    const res = await twentyIntegrationService.pushMeetingNote("ws-1", transcript(), {
+      companyId: "co-uriach",
+      personIds: ["p-david"],
+    });
+
+    expect(res.outcome).toBe("CREATED");
+    expect(res.noteId).toBe("note-1");
+  });
 });
 
 describe("buildNoteMarkdown", () => {

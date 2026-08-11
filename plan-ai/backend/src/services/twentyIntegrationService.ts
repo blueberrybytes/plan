@@ -337,15 +337,32 @@ class TwentyIntegrationService {
     for (const personId of args.personIds) targets.push({ personId });
     if (args.opportunityId) targets.push({ opportunityId: args.opportunityId });
 
+    let linked = 0;
     for (const target of targets) {
       try {
         await this.fetchTwenty<unknown>(baseUrl, apiKey, "/noteTargets", {
           method: "POST",
           body: JSON.stringify({ noteId, ...target }),
         });
+        linked += 1;
       } catch (error) {
-        logger.warn(`[twenty] could not link note ${noteId} to ${JSON.stringify(target)}`, error);
+        // logger.error (not warn) on purpose: this reaches Sentry. A note that
+        // exists but isn't linked is INVISIBLE in the client's CRM — it shows on
+        // no timeline — while the user is told the push succeeded. Exactly the
+        // silent failure we need an alert for.
+        logger.error(`[twenty] could not link note ${noteId} to ${JSON.stringify(target)}`, error, {
+          noteId,
+          target,
+        });
       }
+    }
+
+    // Every link failed: the note is orphaned in the CRM. Surface it instead of
+    // reporting success — the caller marks the push FAILED so it can be retried.
+    if (linked === 0) {
+      throw new Error(
+        `Twenty note ${noteId} was created but could not be linked to any record (${targets.length} targets failed)`,
+      );
     }
 
     return { noteId, url: `${baseUrl}/object/note/${noteId}` };
