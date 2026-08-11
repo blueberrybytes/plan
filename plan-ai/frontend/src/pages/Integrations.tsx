@@ -1149,6 +1149,7 @@ const Integrations: React.FC = () => {
               {config.tabValue !== "jira" &&
                 config.tabValue !== "linear" &&
                 config.tabValue !== "trello" &&
+                config.tabValue !== "twenty" &&
                 config.tabValue !== "github" &&
                 config.tabValue !== "google" &&
                 config.tabValue !== "notion" &&
