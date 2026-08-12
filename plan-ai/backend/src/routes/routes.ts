@@ -898,6 +898,7 @@ const models: TsoaRoute.Models = {
             "finishedAt": {"dataType":"string"},
             "count": {"dataType":"double"},
             "url": {"dataType":"string"},
+            "publicUrl": {"dataType":"string"},
         },
         "additionalProperties": false,
     },

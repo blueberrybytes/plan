@@ -2380,6 +2380,10 @@
 					"url": {
 						"type": "string",
 						"description": "Optional deep link to the produced resource (doc URL, page URL, etc.)"
+					},
+					"publicUrl": {
+						"type": "string",
+						"description": "Share link for the same resource, readable without signing in.\n\nKept apart from `url` because that one points at the in-app view and is\nuseless to anyone outside the workspace. This is what may be handed to a\nclient — e.g. the meeting document linked from a CRM note."
 					}
 				},
 				"required": [
