@@ -1289,7 +1289,20 @@ export class ProjectTranscriptService {
           await this.setPostMeetingTaskStatus(result.transcript.id, "doc", {
             status: "OK",
             url: `/docs/view/${doc.id}`,
+            publicUrl,
           });
+
+          // The CRM note was created before this document existed — the Twenty
+          // push fires earlier in this same method and neither waits for the
+          // other. Patch the link in now that there is something to link to.
+          void twentyIntegrationService
+            .appendDocLinkToNote(input.workspaceId, result.transcript.id, publicUrl)
+            .catch((err) =>
+              logger.error(
+                `[twenty] could not add the document link to the note for transcript ${result.transcript.id}`,
+                err,
+              ),
+            );
 
           // Batch-update all tasks with publicDocUrl in a single transaction
           // instead of N findUnique+update calls.

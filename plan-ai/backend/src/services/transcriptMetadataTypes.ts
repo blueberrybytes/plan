@@ -20,6 +20,14 @@ export interface PostMeetingTaskStatus {
   count?: number;
   /** Optional deep link to the produced resource (doc URL, page URL, etc.) */
   url?: string;
+  /**
+   * Share link for the same resource, readable without signing in.
+   *
+   * Kept apart from `url` because that one points at the in-app view and is
+   * useless to anyone outside the workspace. This is what may be handed to a
+   * client — e.g. the meeting document linked from a CRM note.
+   */
+  publicUrl?: string;
 }
 
 export type PostMeetingTasksRecord = Partial<Record<PostMeetingTaskKind, PostMeetingTaskStatus>>;

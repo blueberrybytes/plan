@@ -1,6 +1,7 @@
 import { IntegrationProvider, IntegrationStatus, Prisma, type Transcript } from "@prisma/client";
 import prisma from "../prisma/prismaClient";
 import { logger } from "../utils/logger";
+import EnvUtils from "../utils/EnvUtils";
 import type { TwentyIntegrationMetadata } from "./integrationMetadataTypes";
 import type { TranscriptMetadata, TwentyNoteRef, SpeakerInsight } from "./transcriptMetadataTypes";
 import type {
@@ -28,6 +29,12 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 /** Never ship a wall of raw transcript into someone's CRM. */
 const MAX_NOTE_MARKDOWN_CHARS = 20_000;
+
+/**
+ * Link text for the meeting document. Shared so the "already linked" check in
+ * `appendDocLinkToNote` and the text written at push time can't drift apart.
+ */
+const DOC_LINK_LABEL = "[Ver acta completa en Plan AI]";
 
 // ── transcript attachment ──────────────────────────────────────────────────
 //
@@ -404,9 +411,83 @@ class TwentyIntegrationService {
       parts.push(`\n## Puntos clave\n${keyPoints.map((p) => `- ${p}`).join("\n")}`);
     }
 
-    if (publicDocUrl) parts.push(`\n[Ver acta completa en Plan AI](${publicDocUrl})`);
+    if (publicDocUrl) parts.push(`\n${DOC_LINK_LABEL}(${publicDocUrl})`);
 
     return parts.join("\n").slice(0, MAX_NOTE_MARKDOWN_CHARS);
+  }
+
+  /**
+   * Absolute share link for the meeting's generated document, or undefined when
+   * no document was produced (the "create doc" option is opt-in).
+   *
+   * Relative paths are useless inside a CRM note — whoever opens it is not on
+   * our domain — so this resolves against APP_URL.
+   */
+  private resolvePublicDocUrl(transcript: Transcript): string | undefined {
+    const metadata = (transcript.metadata ?? null) as TranscriptMetadata | null;
+    const path = metadata?.postMeetingTasks?.doc?.publicUrl;
+    if (!path) return undefined;
+    if (/^https?:\/\//i.test(path)) return path;
+    const base = EnvUtils.get("APP_URL", "http://localhost:3000").replace(/\/+$/, "");
+    return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+
+  /**
+   * Add the document link to a note that was already pushed.
+   *
+   * The document is generated after the CRM push in the post-meeting pipeline,
+   * and neither step waits for the other, so the note is created before the
+   * link exists. Rather than delay the note — the valuable part — we patch the
+   * link in when the document is ready.
+   *
+   * Silently does nothing when the meeting was never pushed, and appends only
+   * once so a retried generation can't stack duplicate links.
+   */
+  public async appendDocLinkToNote(
+    workspaceId: string,
+    transcriptId: string,
+    publicDocPath: string,
+  ): Promise<void> {
+    const integration = await this.getIntegration(workspaceId);
+    if (!integration) return;
+
+    const transcript = await prisma.transcript.findUnique({
+      where: { id: transcriptId },
+      select: { metadata: true },
+    });
+    const noteRef = ((transcript?.metadata ?? null) as TranscriptMetadata | null)?.twenty;
+
+    // No note, or this recording is a teammate's duplicate pointing at their
+    // note — in that case the canonical push owns the body, not us.
+    if (!noteRef?.noteId || noteRef.role === "SECONDARY") return;
+
+    const base = EnvUtils.get("APP_URL", "http://localhost:3000").replace(/\/+$/, "");
+    const url = /^https?:\/\//i.test(publicDocPath)
+      ? publicDocPath
+      : `${base}${publicDocPath.startsWith("/") ? publicDocPath : `/${publicDocPath}`}`;
+
+    const fetched = await this.fetchTwenty<unknown>(
+      integration.baseUrl,
+      integration.apiKey,
+      `/notes/${noteRef.noteId}`,
+    );
+    const note = this.unwrap<{ bodyV2?: { markdown?: string } }>(fetched, "note");
+    const body = note?.bodyV2?.markdown ?? "";
+    if (body.includes(url)) return;
+
+    await this.fetchTwenty<unknown>(
+      integration.baseUrl,
+      integration.apiKey,
+      `/notes/${noteRef.noteId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          bodyV2: { markdown: `${body}\n\n${DOC_LINK_LABEL}(${url})` },
+        }),
+      },
+    );
+
+    logger.info(`[twenty] linked document ${url} on note ${noteRef.noteId}`);
   }
 
   /**
@@ -760,7 +841,11 @@ class TwentyIntegrationService {
 
     const baseBucket = toDayBucket(interval.startedAt);
     const title = `${transcript.title?.trim() || "Reunión"} · ${baseBucket}`;
-    const markdown = this.buildNoteMarkdown(transcript);
+    // Include the document link up front when it already exists — true for a
+    // manual push of an older meeting. When it doesn't (the automatic push runs
+    // before the document is generated) `appendDocLinkToNote` patches it in
+    // later, so the link lands either way.
+    const markdown = this.buildNoteMarkdown(transcript, this.resolvePublicDocUrl(transcript));
     const personIds = args.personIds ?? [];
 
     // Walk buckets: base, then #2, #3… when the user insists it's a distinct meeting.

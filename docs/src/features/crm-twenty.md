@@ -10,13 +10,19 @@ One meeting produces three things on the company record:
 
 | | What it is | Why separate |
 | --- | --- | --- |
-| **Note** | Date, attendees, summary, key points | Readable in five seconds from the timeline |
+| **Note** | Date, attendees, summary, key points, and a link to the meeting document when one was generated | Readable in five seconds from the timeline |
 | **File** | The full transcript, `.md`, one line per speaker turn | The raw words, for when the summary isn't enough |
 | **Timeline entry** | The note, stamped at the real meeting time | Puts the meeting in the right chronological place |
 
 The split is deliberate. A wall of raw transcript pasted into a CRM timeline is unreadable, so the note stays a summary and the transcript rides along as an attachment you open only when you need it.
 
 The timeline entry exists for a subtler reason: a note is dated when Plan AI **pushes** it, which can be hours after the call. Left alone, the CRM would tell the wrong story about when things happened. The timeline entry carries its own timestamp, so the meeting sits where it actually occurred.
+
+::: warning The document link is public
+The meeting document is linked with its **share URL**, which opens without signing in — that's what makes it useful to a client reading the CRM. It only appears when you asked for a document to be generated; the note says nothing about one otherwise.
+
+The link is added when the document is ready, which is usually a moment after the note itself, since the document takes longer to produce than the note does. The **project digest** is deliberately not linked: it re-synthesises every meeting in the project, and a per-meeting note in a client's CRM is the wrong place to publish that.
+:::
 
 ::: info Calendar events
 Twenty can also hold the meeting as a calendar event, and Plan AI does **not** create one. An event only shows its title when it belongs to a calendar channel, channels only exist for a connected Google or Microsoft account, and none can be created through the API — so an event we wrote would appear on the company as a row marked "Not shared", with the time but no title. A masked row is worse than no row.

@@ -20,7 +20,7 @@ This is the most critical environment file. It handles database connections, API
 | `PORT` | The port the Express API runs on. | `8080` |
 | `FRONTEND_URL` | The public URL of the frontend app (for CORS). | `http://localhost:3000` |
 | `BACKEND_URL` | The public URL of this API (for webhooks). | `https://api.plan-ai.com` |
-| `APP_URL` | The main URL of the app (used in emails). | `https://plan-ai.blueberrybytes.com` |
+| `APP_URL` | The main URL of the app. Used to build links that leave the product — emails, and the document link written into CRM notes — so a wrong value ships a broken link to your customers. | `https://plan-ai.blueberrybytes.com` |
 | `CORS_ORIGINS` | Comma-separated list of allowed CORS origins for production. Leave empty for local dev (allows all origins). | `https://plan-ai.blueberrybytes.com` |
 | `API_ADMIN_KEY` | Secret key for cron jobs or admin overrides. | `test123` |
 | `LOG_LEVEL` | Logging verbosity (`info`, `debug`, `error`). | `info` |
