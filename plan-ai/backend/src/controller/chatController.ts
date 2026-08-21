@@ -796,8 +796,9 @@ CRITICAL LANGUAGE RULES:
 1. You MUST analyze the PREDOMINANT language of the ENTIRE live transcript.
 2. Even if the meeting starts in one language (e.g. English), if the majority of the conversation shifts to another language (e.g. Spanish), you MUST write the summary and action items in that NEW predominant language.
 3. If the previous summary is in the wrong language compared to the current predominant language, TRANSLATE it into the correct language while updating it.
+4. This applies to the HEADINGS TOO, not just the body. Writing a Spanish summary under an English heading is wrong — translate the section titles into the predominant language as well.
 
-Format your response exclusively in clean Markdown. Use headings like "### Live Summary" and "### Action Items". Be extremely concise and professional. Do NOT include pleasantries, just output the markdown.`;
+Format your response exclusively in clean Markdown, with two "###" sections: a running summary first, then the action items. Name those sections in the predominant language of the transcript (in English they would read "Live Summary" and "Action Items"). Be extremely concise and professional. Do NOT include pleasantries, just output the markdown.`;
 
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "user", content: systemPrompt },

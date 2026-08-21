@@ -30,11 +30,75 @@ const REQUEST_TIMEOUT_MS = 15_000;
 /** Never ship a wall of raw transcript into someone's CRM. */
 const MAX_NOTE_MARKDOWN_CHARS = 20_000;
 
+
 /**
- * Link text for the meeting document. Shared so the "already linked" check in
- * `appendDocLinkToNote` and the text written at push time can't drift apart.
+ * Section labels for the note and the transcript file, by meeting language.
+ *
+ * These wrap content the model already writes in the meeting's language, so a
+ * fixed label set produces a mismatch: an English meeting was arriving in the
+ * client's CRM under Spanish headings. `Transcript.language` is free-form text
+ * the model reports ("english", "spanish", …), so it is normalised by prefix
+ * rather than matched exactly.
+ *
+ * Spanish is the fallback because that is what every note said before this
+ * existed — an undetected language keeps behaving as it always has.
  */
-const DOC_LINK_LABEL = "[Ver acta completa en Plan AI]";
+interface NoteLabels {
+  date: string;
+  attendees: string;
+  duration: string;
+  summary: string;
+  keyPoints: string;
+  transcript: string;
+  docLink: string;
+  fallbackTitle: string;
+  noTranscript: string;
+}
+
+const NOTE_LABELS: Record<"es" | "en" | "ca", NoteLabels> = {
+  es: {
+    date: "Fecha",
+    attendees: "Asistentes",
+    duration: "Duración",
+    summary: "Resumen",
+    keyPoints: "Puntos clave",
+    transcript: "Transcripción",
+    docLink: "Ver acta completa en Plan AI",
+    fallbackTitle: "Reunión",
+    noTranscript: "(sin transcripción)",
+  },
+  en: {
+    date: "Date",
+    attendees: "Attendees",
+    duration: "Duration",
+    summary: "Summary",
+    keyPoints: "Key points",
+    transcript: "Transcript",
+    docLink: "Read the full write-up in Plan AI",
+    fallbackTitle: "Meeting",
+    noTranscript: "(no transcript)",
+  },
+  ca: {
+    date: "Data",
+    attendees: "Assistents",
+    duration: "Durada",
+    summary: "Resum",
+    keyPoints: "Punts clau",
+    transcript: "Transcripció",
+    docLink: "Veure l'acta completa a Plan AI",
+    fallbackTitle: "Reunió",
+    noTranscript: "(sense transcripció)",
+  },
+};
+
+/** Picks the label set matching the meeting, defaulting to Spanish. */
+const labelsFor = (language?: string | null): NoteLabels => {
+  const l = (language ?? "").trim().toLowerCase();
+  if (l.startsWith("en")) return NOTE_LABELS.en;
+  if (l.startsWith("ca")) return NOTE_LABELS.ca;
+  return NOTE_LABELS.es;
+};
+
 
 // ── transcript attachment ──────────────────────────────────────────────────
 //
@@ -390,8 +454,9 @@ class TwentyIntegrationService {
     const metadata = (transcript.metadata ?? null) as TranscriptMetadata | null;
     const parts: string[] = [];
 
+    const t = labelsFor(transcript.language);
     const when = transcript.recordedAt ?? transcript.createdAt;
-    parts.push(`**Fecha:** ${when.toISOString().slice(0, 10)}`);
+    parts.push(`**${t.date}:** ${when.toISOString().slice(0, 10)}`);
 
     const speakers: SpeakerInsight[] = metadata?.speakers ?? [];
     if (speakers.length > 0) {
@@ -401,17 +466,17 @@ class TwentyIntegrationService {
           return s.role ? `${name} (${s.role})` : name;
         })
         .join(", ");
-      parts.push(`**Asistentes:** ${attendees}`);
+      parts.push(`**${t.attendees}:** ${attendees}`);
     }
 
-    if (transcript.summary) parts.push(`\n## Resumen\n${transcript.summary}`);
+    if (transcript.summary) parts.push(`\n## ${t.summary}\n${transcript.summary}`);
 
     const keyPoints = metadata?.keyPoints ?? [];
     if (keyPoints.length > 0) {
-      parts.push(`\n## Puntos clave\n${keyPoints.map((p) => `- ${p}`).join("\n")}`);
+      parts.push(`\n## ${t.keyPoints}\n${keyPoints.map((p) => `- ${p}`).join("\n")}`);
     }
 
-    if (publicDocUrl) parts.push(`\n${DOC_LINK_LABEL}(${publicDocUrl})`);
+    if (publicDocUrl) parts.push(`\n[${t.docLink}](${publicDocUrl})`);
 
     return parts.join("\n").slice(0, MAX_NOTE_MARKDOWN_CHARS);
   }
@@ -453,7 +518,7 @@ class TwentyIntegrationService {
 
     const transcript = await prisma.transcript.findUnique({
       where: { id: transcriptId },
-      select: { metadata: true },
+      select: { metadata: true, language: true },
     });
     const noteRef = ((transcript?.metadata ?? null) as TranscriptMetadata | null)?.twenty;
 
@@ -482,7 +547,7 @@ class TwentyIntegrationService {
       {
         method: "PATCH",
         body: JSON.stringify({
-          bodyV2: { markdown: `${body}\n\n${DOC_LINK_LABEL}(${url})` },
+          bodyV2: { markdown: `${body}\n\n[${labelsFor(transcript?.language).docLink}](${url})` },
         }),
       },
     );
@@ -497,12 +562,13 @@ class TwentyIntegrationService {
    */
   public buildTranscriptFileMarkdown(transcript: Transcript): string {
     const metadata = (transcript.metadata ?? null) as TranscriptMetadata | null;
+    const t = labelsFor(transcript.language);
     const when = transcript.recordedAt ?? transcript.createdAt;
-    const parts: string[] = [`# ${transcript.title?.trim() || "Reunión"}`, ""];
+    const parts: string[] = [`# ${transcript.title?.trim() || t.fallbackTitle}`, ""];
 
-    parts.push(`**Fecha:** ${when.toISOString().slice(0, 10)}`);
+    parts.push(`**${t.date}:** ${when.toISOString().slice(0, 10)}`);
     if (transcript.durationSeconds) {
-      parts.push(`**Duración:** ${Math.round(transcript.durationSeconds / 60)} min`);
+      parts.push(`**${t.duration}:** ${Math.round(transcript.durationSeconds / 60)} min`);
     }
 
     const speakers: SpeakerInsight[] = metadata?.speakers ?? [];
@@ -513,12 +579,12 @@ class TwentyIntegrationService {
           return s.role ? `${name} (${s.role})` : name;
         })
         .join(", ");
-      parts.push(`**Asistentes:** ${attendees}`);
+      parts.push(`**${t.attendees}:** ${attendees}`);
     }
 
-    if (transcript.summary) parts.push("", "## Resumen", transcript.summary);
+    if (transcript.summary) parts.push("", `## ${t.summary}`, transcript.summary);
 
-    parts.push("", "## Transcripción", "");
+    parts.push("", `## ${t.transcript}`, "");
 
     // Prefer diarized turns — "who said what" is most of the value of having
     // the raw transcript at all. Fall back to the flat text when absent.
@@ -535,7 +601,7 @@ class TwentyIntegrationService {
         parts.push(`**${nameFor(u.speaker)}:** ${u.transcript}`, "");
       }
     } else {
-      parts.push(transcript.transcript ?? "(sin transcripción)");
+      parts.push(transcript.transcript ?? t.noTranscript);
     }
 
     return parts.join("\n");
@@ -840,7 +906,7 @@ class TwentyIntegrationService {
     }
 
     const baseBucket = toDayBucket(interval.startedAt);
-    const title = `${transcript.title?.trim() || "Reunión"} · ${baseBucket}`;
+    const title = `${transcript.title?.trim() || labelsFor(transcript.language).fallbackTitle} · ${baseBucket}`;
     // Include the document link up front when it already exists — true for a
     // manual push of an older meeting. When it doesn't (the automatic push runs
     // before the document is generated) `appendDocLinkToNote` patches it in
