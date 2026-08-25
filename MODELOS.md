@@ -1,6 +1,6 @@
 # Revisión de modelos — agosto 2026
 
-Precios sacados del catálogo **en vivo** de OpenRouter (`/api/v1/models`, 406 modelos) el 12 de agosto de 2026, no de memoria. Todo lo que hay aquí es comprobable volviendo a lanzar esa consulta, y los 22 ids del catálogo de la app están verificados con `yarn verify:models`.
+Precios sacados del catálogo **en vivo** de OpenRouter (`/api/v1/models`, 406 modelos) el 12 de agosto de 2026, no de memoria. Todo lo que hay aquí es comprobable volviendo a lanzar esa consulta, y los 23 ids del catálogo de la app están verificados con `yarn verify:models`.
 
 ::: warning Leed esto antes que las tablas
 El precio que devuelve la API **no es el que necesariamente pagáis**. Dos motivos, ambos comprobados en la web de OpenRouter:
@@ -21,6 +21,34 @@ Hasta **3,6x de diferencia** entre proveedores del mismo modelo, según a cuál 
 
 **Las comparaciones de este documento siguen siendo válidas** porque todas las cifras salen del mismo campo, así que las proporciones se mantienen. Lo que no debéis hacer es tomar los valores absolutos como vuestra factura. Para eso tenéis el dato real: `aiUsageService` guarda el coste que devuelve OpenRouter en cada llamada.
 :::
+
+---
+
+## 0. Lo que ha cambiado en un día
+
+Este documento se escribió ayer. Al reverificarlo hoy, **tres cosas se habían movido**, que es exactamente lo que avisaba el último apartado:
+
+**El descuento de Luna se acabó.** `openai/gpt-5.6-luna` está ahora a **$0.20/$1.20**, su tarifa de lista. Las tablas de abajo lo muestran a $0.10/$0.60 con un "50% off" que ya no existe. Sigue siendo más barato que el modelo por defecto ($14 vs $24.50 por 1.000 reuniones), pero deja de ser el líder de precio.
+
+**DeepSeek R1 perdió proveedores.** Pasó de 163.840 de contexto a **64.000**, porque se quedó con un único proveedor. El valor que yo había puesto (160.000) se volvió incorrecto en menos de 24 horas.
+
+**Salieron modelos nuevos**, uno de ellos esta misma semana:
+
+| Modelo | Precio | Contexto | Lanzado | Qué sustituye |
+| --- | --- | --- | --- | --- |
+| `google/gemini-3.7-flash` | $0.38/$1.88 | 1.048.576 | **esta semana** | más barato y 14 meses más nuevo que el default |
+| `deepseek/deepseek-v4-flash` | $0.08/$0.17 | 384k–1M | 2026-04 | a V3.2: 3x más barato, 6x más contexto |
+| `x-ai/grok-4.6` | $2.00/$6.00 | 500.000 | 2026-08 | a Grok 4.5, mismo precio |
+
+Los tres están ya en el catálogo, y V3.2 y Grok 4.5 fuera.
+
+### Y una trampa que casi entra
+
+`deepseek-v4-flash` anuncia **1.048.576** de contexto, pero lo sirven **17 proveedores y el más pequeño tope en 384.000**. La cifra de cabecera es lo que ofrece la mejor ruta, no lo que aguanta cualquiera. Está declarado a 380.000.
+
+`yarn verify:models` habría dado el visto bueno a 1M, porque solo miraba la cabecera. Ahora también mira el **mínimo por proveedor** y avisa cuando el declarado lo supera. No lo hace fallar —OpenRouter normalmente descarta proveedores demasiado pequeños para la petición— pero sí lo señala, porque en la ruta que **fija el proveedor** (`allow_fallbacks: false`, la de contexto cacheado) no hay reenrutado que te salve.
+
+Con ese aviso salieron a la luz tres más que ya estaban: GLM-5.2 (mínimo 202.752), MiniMax M3 (256.000) y Llama 3.3 (**12.288** frente a los 130.000 declarados).
 
 ---
 
@@ -162,7 +190,7 @@ Deliberadamente **no** es uno de los fine-tunes "uncensored" de rol (Dolphin Ven
 
 En el selector se distingue con la etiqueta **Sin censura** en color de aviso, no como una capacidad más: elegirlo es una decisión consciente.
 
-El catálogo pasa de 8 a 22 modelos, organizados en cuatro gamas —económica, equilibrada, potente y frontera— más los de pesos abiertos, con el precio escrito en cada descripción para que se pueda decidir sin salir de la app. Cubre 11 proveedores distintos, así que una caída de uno no deja a nadie sin alternativa en su gama.
+El catálogo pasa de 8 a 23 modelos, organizados en cuatro gamas —económica, equilibrada, potente y frontera— más los de pesos abiertos, con el precio escrito en cada descripción para que se pueda decidir sin salir de la app. Cubre 11 proveedores distintos, así que una caída de uno no deja a nadie sin alternativa en su gama.
 
 Hay un test (`aiModelCatalogue.spec.ts`) que ahora impide volver a declarar más contexto del real, y que obliga a apuntar el contexto verificado al añadir cualquier modelo — el paso que se saltó con MiniMax.
 

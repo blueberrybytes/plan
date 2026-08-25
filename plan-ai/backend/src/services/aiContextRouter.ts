@@ -45,6 +45,13 @@ export const AI_MODEL_LIMITS: Record<string, ModelLimits> = {
       "Newest OpenAI generation at budget pricing — ~$0.10/$0.60 per 1M tokens with a 1M context. Strong structured output for the money.",
     tags: ["Cheapest", "High Context", "OpenAI"],
   },
+  "google/gemini-3.7-flash": {
+    modelName: "Gemini 3.7 Flash",
+    maxTokens: 1000000,
+    description:
+      "Fourteen months newer than 2.5 Flash and slightly cheaper for a transcript-shaped workload — ~$0.38/$1.88 per 1M tokens with a 1M context. The natural successor to the default.",
+    tags: ["Balanced", "High Context", "Google"],
+  },
   "google/gemini-2.5-flash": {
     modelName: "Gemini 2.5 Flash",
     maxTokens: 1000000,
@@ -52,12 +59,15 @@ export const AI_MODEL_LIMITS: Record<string, ModelLimits> = {
       "Incredibly fast response times with a massive context window. ~$0.30/$2.50 per 1M tokens. Ideal for live chat and basic RAG.",
     tags: ["Fast", "Chat", "Google"],
   },
-  "deepseek/deepseek-v3.2": {
-    modelName: "DeepSeek V3.2",
-    maxTokens: 160000,
+  // Declared at 380k, not the 1,048,576 it advertises: this model is served by
+  // 17 providers and the smallest caps at 384,000. The headline is what the
+  // best route offers, not what every route can take.
+  "deepseek/deepseek-v4-flash": {
+    modelName: "DeepSeek V4 Flash",
+    maxTokens: 380000,
     description:
-      "Excellent value from an open-weights lab — ~$0.27/$0.40 per 1M tokens. Cheap output makes it a good fit for long documents and summaries.",
-    tags: ["Cheap Output", "Open Source", "DeepSeek"],
+      "The cheapest option in the catalogue — ~$0.08/$0.17 per 1M tokens, roughly a third of Gemini Flash Lite, and it still swallows a long meeting. Replaces V3.2, which cost three times more for a sixth of the context.",
+    tags: ["Cheapest", "Cheap Output", "DeepSeek"],
   },
 
   // ── Balanced: the sweet spot for most meeting work ────────────────────────
@@ -119,11 +129,11 @@ export const AI_MODEL_LIMITS: Record<string, ModelLimits> = {
       "Google's flagship 2026 model at ~$2/$12 per 1M tokens. Best for massive datasets, huge codebases, and deep document analysis.",
     tags: ["High Context", "Reasoning", "Google"],
   },
-  "x-ai/grok-4.5": {
-    modelName: "Grok 4.5",
+  "x-ai/grok-4.6": {
+    modelName: "Grok 4.6",
     maxTokens: 500000,
     description:
-      "xAI's flagship at ~$2/$6 per 1M tokens — notably cheap output for its tier, with a 500k window.",
+      "xAI's flagship at ~$2/$6 per 1M tokens — notably cheap output for its tier, with a 500k window. Same price as 4.5, one generation newer.",
     tags: ["Reasoning", "Cheap Output", "xAI"],
   },
   "qwen/qwen3-max": {

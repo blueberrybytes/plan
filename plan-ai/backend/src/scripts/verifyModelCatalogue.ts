@@ -52,12 +52,31 @@ const main = async (): Promise<void> => {
     // A bad id 404s here — the check a catalogue lookup alone can't make.
     const res = await fetch(`${OPENROUTER_MODELS}/${id}/endpoints`);
     let providers = 0;
+    let smallestProviderContext = Infinity;
     if (res.ok) {
-      const body = (await res.json()) as { data?: { endpoints?: unknown[] } };
-      providers = body.data?.endpoints?.length ?? 0;
+      const body = (await res.json()) as {
+        data?: { endpoints?: { context_length?: number }[] };
+      };
+      const endpoints = body.data?.endpoints ?? [];
+      providers = endpoints.length;
+      for (const e of endpoints) {
+        if (typeof e.context_length === "number" && e.context_length > 0) {
+          smallestProviderContext = Math.min(smallestProviderContext, e.context_length);
+        }
+      }
     }
 
+    // The headline is the best any provider offers; individual providers can
+    // serve far less (DeepSeek V4 Flash advertises 1,048,576 while some of its
+    // routes cap at 384,000). OpenRouter normally skips providers too small for
+    // the request, so exceeding the headline is the hard error, and exceeding
+    // the floor is a warning — it turns into a real failure on the route that
+    // pins the provider (`allow_fallbacks: false`, used for the cached-context
+    // model), where there is no reroute to a bigger endpoint.
     const real = model?.context_length ?? 0;
+    const providerFloor = Number.isFinite(smallestProviderContext)
+      ? smallestProviderContext
+      : real;
     const hasSchema = (model?.supported_parameters ?? []).includes("structured_outputs");
 
     const issues: string[] = [];
@@ -85,6 +104,13 @@ const main = async (): Promise<void> => {
     // error — worth knowing before it's someone's default.
     if (!issues.length && providers === 1) {
       console.log(`${" ".repeat(38)} ⚠ single provider — no failover if it goes down`);
+    }
+
+    if (!issues.length && declared > providerFloor) {
+      console.log(
+        `${" ".repeat(38)} ⚠ smallest route serves only ${providerFloor.toLocaleString()} — ` +
+          `fine while OpenRouter can reroute, a failure if the provider is pinned`,
+      );
     }
   }
 
