@@ -1,6 +1,6 @@
 # Revisión de modelos — agosto 2026
 
-Precios sacados del catálogo **en vivo** de OpenRouter (`/api/v1/models`, 406 modelos) el 12 de agosto de 2026, no de memoria. Todo lo que hay aquí es comprobable volviendo a lanzar esa consulta, y los 21 ids del catálogo de la app están verificados con `yarn verify:models`.
+Precios sacados del catálogo **en vivo** de OpenRouter (`/api/v1/models`, 406 modelos) el 12 de agosto de 2026, no de memoria. Todo lo que hay aquí es comprobable volviendo a lanzar esa consulta, y los 22 ids del catálogo de la app están verificados con `yarn verify:models`.
 
 ::: warning Leed esto antes que las tablas
 El precio que devuelve la API **no es el que necesariamente pagáis**. Dos motivos, ambos comprobados en la web de OpenRouter:
@@ -152,7 +152,17 @@ El de MiniMax es un fallo de verdad: quien eligiera ese modelo con un contexto g
 
 Corregidos los tres, y M2.7 sustituido por **M3**, que sí tiene el millón de contexto por un precio parecido.
 
-El catálogo pasa de 8 a 21 modelos, organizados en cuatro gamas —económica, equilibrada, potente y frontera— más los de pesos abiertos, con el precio escrito en cada descripción para que se pueda decidir sin salir de la app. Cubre 10 proveedores distintos, así que una caída de uno no deja a nadie sin alternativa en su gama.
+### Un modelo sin filtros
+
+`nousresearch/hermes-3-llama-3.1-70b` — 131k de contexto, `structured_outputs`, ~$0.70/$0.70 por millón.
+
+Está porque un modelo con alineamiento de seguridad a veces **se niega a resumir una reunión legítima**: un incidente de seguridad, un caso de RRHH, una disputa legal, o simplemente lenguaje crudo. Negarse ante una grabación que el usuario ya posee no protege a nadie, solo rompe el producto. Hermes obedece el system prompt en vez de aplicar juicios propios.
+
+Deliberadamente **no** es uno de los fine-tunes "uncensored" de rol (Dolphin Venice, Magnum, MythoMax, Euryale…). Esos están hechos para ficción, extraen mal, y el más conocido —`cognitivecomputations/dolphin-mistral-24b-venice-edition`— **no soporta `structured_outputs`**: meterlo en el selector rompería en silencio la extracción de tickets de quien lo eligiera. El guardarraíl `yarn verify:models` lo rechaza por eso mismo.
+
+En el selector se distingue con la etiqueta **Sin censura** en color de aviso, no como una capacidad más: elegirlo es una decisión consciente.
+
+El catálogo pasa de 8 a 22 modelos, organizados en cuatro gamas —económica, equilibrada, potente y frontera— más los de pesos abiertos, con el precio escrito en cada descripción para que se pueda decidir sin salir de la app. Cubre 11 proveedores distintos, así que una caída de uno no deja a nadie sin alternativa en su gama.
 
 Hay un test (`aiModelCatalogue.spec.ts`) que ahora impide volver a declarar más contexto del real, y que obliga a apuntar el contexto verificado al añadir cualquier modelo — el paso que se saltó con MiniMax.
 

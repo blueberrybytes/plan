@@ -172,9 +172,12 @@ export const AI_MODEL_LIMITS: Record<string, ModelLimits> = {
   },
 
   // ── Open weights ──────────────────────────────────────────────────────────
+  // 60k, not the 160k this briefly claimed: R1 is down to a single provider
+  // serving 64k, so the usable window collapsed when the others dropped off.
+  // Provider mix moves — re-check with `yarn verify:models`, not from memory.
   "deepseek/deepseek-r1": {
     modelName: "DeepSeek R1",
-    maxTokens: 160000,
+    maxTokens: 60000,
     description:
       "DeepSeek's reasoning model, ~$0.70/$2.50 per 1M tokens. Specialised in chain-of-thought logic and system architecture.",
     tags: ["Reasoning", "Open Source", "DeepSeek"],
@@ -185,6 +188,24 @@ export const AI_MODEL_LIMITS: Record<string, ModelLimits> = {
     description:
       "Meta's open LLM at ~$0.10/$0.32 per 1M tokens, optimised for instruction following and general tasks.",
     tags: ["Open Source", "Meta", "Cheapest"],
+  },
+
+  // Neutrally-aligned option. Safety-tuned models sometimes decline to
+  // summarise a legitimate meeting — a security incident, an HR case, a legal
+  // dispute, or simply blunt language — and a refusal on a recording the user
+  // already owns is a product failure, not a safeguard. Hermes follows the
+  // system prompt instead of applying judgements of its own.
+  //
+  // Deliberately NOT one of the "uncensored" roleplay fine-tunes: those are
+  // built for fiction, are weak at extraction, and the best known one (Dolphin
+  // Venice) doesn't support structured_outputs at all, so picking it would
+  // silently break every ticket the pipeline tries to extract.
+  "nousresearch/hermes-3-llama-3.1-70b": {
+    modelName: "Hermes 3 70B",
+    maxTokens: 130000,
+    description:
+      "Neutrally aligned and highly steerable — it follows your instructions rather than refusing on its own judgement. Pick it when a meeting covers material other models decline to summarise. ~$0.70/$0.70 per 1M tokens. Being Llama-3.1-era, extraction quality sits below the frontier options.",
+    tags: ["Unfiltered", "Open Source", "Nous"],
   },
 };
 

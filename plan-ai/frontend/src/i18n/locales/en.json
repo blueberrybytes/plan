@@ -1447,5 +1447,23 @@
       "unlinked": "Project unlinked from Twenty.",
       "error": "Couldn't update the Twenty link."
     }
+  },
+  "aiModelTags": {
+    "Agentic": "Agentic",
+    "Balanced": "Balanced",
+    "Chat": "Chat",
+    "Cheap Output": "Cheap Output",
+    "Cheapest": "Cheapest",
+    "Coding": "Coding",
+    "Fast": "Fast",
+    "Frontier": "Frontier",
+    "High Context": "High Context",
+    "High Reasoning": "High Reasoning",
+    "Multilingual": "Multilingual",
+    "Open Source": "Open Source",
+    "Reasoning": "Reasoning",
+    "Structured Output": "Structured Output",
+    "Unfiltered": "Unfiltered",
+    "Writing": "Writing"
   }
 }

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Box, Typography, FormControl, Select, MenuItem, Chip } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useGetModelsQuery } from "../../store/apis/aiApi";
@@ -9,8 +10,17 @@ interface AiModelSelectorProps {
   disabled?: boolean;
 }
 
+/**
+ * Tags arrive from the backend as raw English keys. They are translated here
+ * rather than at the source so the same catalogue serves every locale, and an
+ * unknown tag falls back to its own text instead of rendering a missing key.
+ */
+const UNFILTERED_TAG = "Unfiltered";
+
 const AiModelSelector: React.FC<AiModelSelectorProps> = ({ value, onChange, disabled }) => {
+  const { t } = useTranslation();
   const { data: models, isLoading } = useGetModelsQuery();
+  const tagLabel = (tag: string) => t(`aiModelTags.${tag}`, { defaultValue: tag });
 
   React.useEffect(() => {
     // Only attempt to restore once when the component initially mounts with an empty value
@@ -101,15 +111,22 @@ const AiModelSelector: React.FC<AiModelSelectorProps> = ({ value, onChange, disa
                   {model.name}
                 </Typography>
                 <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
-                  {model.tags?.map((tag) => (
-                    <Chip
-                      key={tag}
-                      label={tag}
-                      size="small"
-                      variant="outlined"
-                      sx={{ height: 20, fontSize: "0.65rem" }}
-                    />
-                  ))}
+                  {model.tags?.map((tag) => {
+                    // Called out rather than blended in: choosing a model that
+                    // won't refuse is a deliberate decision, so it shouldn't
+                    // look like just another capability chip.
+                    const unfiltered = tag === UNFILTERED_TAG;
+                    return (
+                      <Chip
+                        key={tag}
+                        label={tagLabel(tag)}
+                        size="small"
+                        variant={unfiltered ? "filled" : "outlined"}
+                        color={unfiltered ? "warning" : "default"}
+                        sx={{ height: 20, fontSize: "0.65rem" }}
+                      />
+                    );
+                  })}
                 </Box>
               </Box>
             </MenuItem>

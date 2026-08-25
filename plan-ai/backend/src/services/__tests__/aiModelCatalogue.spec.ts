@@ -55,8 +55,9 @@ const REAL_CONTEXT: Record<string, number> = {
   "anthropic/claude-opus-4.7": 1_000_000,
   "openai/gpt-5.5": 1_050_000,
   "moonshotai/kimi-k3": 1_048_576,
-  "deepseek/deepseek-r1": 163_840,
+  "deepseek/deepseek-r1": 64_000,
   "meta-llama/llama-3.3-70b-instruct": 131_072,
+  "nousresearch/hermes-3-llama-3.1-70b": 131_072,
 };
 
 describe("AI model catalogue", () => {

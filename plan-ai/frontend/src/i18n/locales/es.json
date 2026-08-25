@@ -1441,5 +1441,23 @@
       "unlinked": "Proyecto desvinculado de Twenty.",
       "error": "No se pudo actualizar el vínculo con Twenty."
     }
+  },
+  "aiModelTags": {
+    "Agentic": "Agéntico",
+    "Balanced": "Equilibrado",
+    "Chat": "Chat",
+    "Cheap Output": "Salida barata",
+    "Cheapest": "Más barato",
+    "Coding": "Programación",
+    "Fast": "Rápido",
+    "Frontier": "Frontera",
+    "High Context": "Contexto amplio",
+    "High Reasoning": "Razonamiento alto",
+    "Multilingual": "Multilingüe",
+    "Open Source": "Código abierto",
+    "Reasoning": "Razonamiento",
+    "Structured Output": "Salida estructurada",
+    "Unfiltered": "Sin censura",
+    "Writing": "Redacción"
   }
 }
