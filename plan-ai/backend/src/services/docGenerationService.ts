@@ -1,6 +1,6 @@
 import { DocDocument, BrandTheme } from "@prisma/client";
 import {
-  getConfiguredModel,
+  getWorkspaceModel,
   getFallbackProviderOptions,
   DOC_MODEL,
   DIAGRAM_MODEL,
@@ -204,7 +204,12 @@ export class DocGenerationService {
       transcriptTexts,
       personaInstructions,
     );
-    const model = getConfiguredModel(DOC_MODEL);
+    // The workspace's own OpenRouter key, not the platform's. `getConfiguredModel`
+    // with no key silently falls back to OPENROUTER_API_KEY, which in a BYOK
+    // product means the platform pays for the customer's document AND the
+    // document fails whenever that shared key is rate-limited — even though the
+    // customer's own key was fine. `workspaceId` was already in scope.
+    const model = await getWorkspaceModel(workspaceId, DOC_MODEL);
 
     // Step 1: Optional Agentic Investigation via MCP
     const tools = mcpClientService.getAiTools();
@@ -326,7 +331,7 @@ export class DocGenerationService {
   ): Promise<string> {
     // Mermaid repair uses the stronger diagram model — a cheap model is what
     // produced the broken syntax in the first place.
-    const model = getConfiguredModel(DIAGRAM_MODEL);
+    const model = await getWorkspaceModel(workspaceId, DIAGRAM_MODEL);
     const prompt = `You are an expert at writing Mermaid.js diagrams. The following Mermaid syntax crashes the renderer due to syntax constraints, invalid characters, or formatting errors.
 Please fix it so it is completely valid Mermaid code.
 

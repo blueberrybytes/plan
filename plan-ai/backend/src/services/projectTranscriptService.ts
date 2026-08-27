@@ -1754,13 +1754,21 @@ ${content}`;
         try {
           const result = await generateText({
             model,
-            // Pin the OpenRouter provider so repeated identical-prefix calls (the
-            // retries below; future batched extraction) reuse Gemini's implicit
-            // cache instead of cold-missing when OpenRouter bounces Google
-            // endpoints. Orthogonal to — and keeps — the json_schema model
-            // fallbacks. NOTE: steady-state reuse stays limited until the prompt
-            // prefix is front-loaded (cf. getCachedContextModel's repo route).
-            providerOptions: getCachedStructuredProviderOptions(activeModel),
+            // First attempt pins the OpenRouter provider so repeated
+            // identical-prefix calls reuse Gemini's implicit cache instead of
+            // cold-missing when OpenRouter bounces Google endpoints.
+            //
+            // Every retry AFTER that unpins it. Pinning means "fail rather than
+            // use another provider", so when Google's shared capacity is
+            // rate-limited upstream there is nowhere to go and the job dies —
+            // observed in production, and retrying the same pinned route can't
+            // help. Dropping the pin on retry lets OpenRouter reroute, which
+            // costs a cold cache exactly when the warm one wasn't available
+            // anyway.
+            providerOptions:
+              attempt === 0
+                ? getCachedStructuredProviderOptions(activeModel)
+                : getStructuredProviderOptions(activeModel),
             output: Output.object({
               name: "TranscriptFullAnalysis",
               description:
@@ -1777,11 +1785,20 @@ ${content}`;
           break;
         } catch (error: any) {
           attempt++;
+          // Rate limits arrive as prose, not always as a status code — the
+          // production failure read "google/gemini-2.5-flash is temporarily
+          // rate-limited upstream" and would not have matched on `code` alone,
+          // so a retryable condition looked permanent.
+          const message: string = error?.message ?? "";
+          const isRateLimited =
+            error?.data?.code === 429 ||
+            error?.statusCode === 429 ||
+            /rate.?limit|too many requests|quota|temporarily unavailable/i.test(message);
           const isTransientError =
             error?.name === "AI_APICallError" &&
-            (error?.message?.includes("Failed to process successful response") ||
-              error?.message?.includes("JSON error injected into SSE stream") ||
-              error?.data?.code === 429);
+            (message.includes("Failed to process successful response") ||
+              message.includes("JSON error injected into SSE stream") ||
+              isRateLimited);
 
           if (isTransientError && attempt < maxManualRetries) {
             logger.warn(
@@ -2864,19 +2881,25 @@ ${transcriptForLLM}`;
     }
 
     if (tools) {
+      // Tracks the app default rather than pinning a model of its own. This was
+      // hardcoded to gemini-2.5-flash in three places (twice before the constant
+      // was even declared), so the default moved to 3.7 Flash everywhere except
+      // here, silently. Whatever the workspace has configured wins anyway; this
+      // is only the fallback when it has nothing set.
+      const MCP_MODEL = DEFAULT_AI_MODEL;
       logger.info(
-        `[TaskRefinement] Step 2: ${toolSource} tools available — running agentic investigation (model=${"google/gemini-2.5-flash"})...`,
+        `[TaskRefinement] Step 2: ${toolSource} tools available — running agentic investigation (model=${MCP_MODEL})...`,
       );
       await onProgress?.({
         phase: "mcp:attempting",
         source: toolSource,
-        model: "google/gemini-2.5-flash",
+        model: MCP_MODEL,
       });
-      const MCP_MODEL = "google/gemini-2.5-flash";
       const tMcp = Date.now();
       try {
-        // Use the workspace's configured model for the MCP investigation.
-        // Falls back to gemini-2.5-flash which is better at tool use than gpt-4o-mini.
+        // Use the workspace's configured model for the MCP investigation, and
+        // fall back to the app default, which is a Gemini Flash and handles tool
+        // use well.
         const mcpModel = await getWorkspaceModel(workspaceId, MCP_MODEL);
         const investigation = await generateText({
           model: mcpModel,

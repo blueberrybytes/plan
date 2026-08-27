@@ -216,7 +216,28 @@ Un matiz sobre los fallbacks: aquí **el contexto importa más que el precio**. 
 
 Y hay una regla que ahora fija un test: **ningún fallback puede ser del mismo proveedor que el modelo principal**. El principal es Google; un fallback de Google se cae con él y no sirve de nada. Por eso la cadena es OpenAI + Anthropic.
 
-**Lo que NO he tocado, a propósito:** `TICKET_MODEL`, `DOC_MODEL`, `SLIDE_MODEL`, `DEFAULT_AI_MODEL` y `CACHED_CONTEXT_MODEL`. Ahí está el 76% de ahorro, y ahí es donde un modelo que falle con el `json_schema` os rompe los tickets. Eso pasa por la evaluación de la Fase 2, no por mi criterio. Cambiar lo demás sin medir sería justo el error que este documento avisa de no cometer.
+**Fase 1b, el default a Gemini 3.7 Flash. ✅ Hecha.**
+
+`DEFAULT_AI_MODEL`, `TICKET_MODEL`, `DOC_MODEL`, `SLIDE_MODEL` y `CACHED_CONTEXT_MODEL` pasan de `gemini-2.5-flash` a **`gemini-3.7-flash`**. Catorce meses más nuevo por prácticamente el mismo dinero.
+
+El precio se mueve en direcciones opuestas: la entrada sube ($0.300 a $0.375 por millón) y la salida baja ($2.500 a $1.875). El punto de cruce está en una proporción entrada:salida de 8,3 a 1:
+
+| entrada:salida | 2.5 Flash | 3.7 Flash | diferencia |
+| --- | --- | --- | --- |
+| 5:1 | $20.00 | $18.75 | −6,2% |
+| 8:1 | $24.50 | $24.38 | −0,5% |
+| 10:1 | $27.50 | $28.12 | +2,3% |
+| 20:1 | $42.50 | $46.88 | +10,3% |
+
+(por cada 1.000 reuniones, con 5.000 tokens de salida)
+
+Mi estimación de vuestro perfil es 8:1, o sea justo en la raya. El peor caso realista es un 10% más caro. Esto se puede dejar de estimar: la consulta del apartado 7 saca la proporción real de `AiUsageLog`.
+
+Mismo millón de contexto y misma familia, así que el tokenizador, el comportamiento con `json_schema` y el caché implícito de Google se mantienen. Eso último importa para `CACHED_CONTEXT_MODEL`, que fija el proveedor con `allow_fallbacks: false`: `yarn verify:models` confirma 6 proveedores y ninguno con la ventana recortada, que es la condición para poder fijarlo.
+
+De paso salió otro string escrito a mano. La investigación agéntica de `projectTranscriptService.ts` tenía `"google/gemini-2.5-flash"` repetido tres veces (dos de ellas antes de declarar la constante que lo guardaba), así que se habría quedado atrás sin que nadie lo notara. Ahora usa `DEFAULT_AI_MODEL`.
+
+**Lo que sigo sin tocar, a propósito:** bajar esas mismas constantes a `gemini-2.5-flash-lite`. Ahí está el 76% de ahorro, y ahí es donde un modelo que falle con el `json_schema` os rompe los tickets. Eso pasa por la evaluación de la Fase 2, no por mi criterio. Moverse a 3.7 es cambiar de generación dentro de la misma gama; bajar a Lite es cambiar de gama, y eso sí hay que medirlo.
 
 Los tests que quedan escritos son la red: fijan que ningún modelo declare más contexto del real, que la cadena de fallback no comparta proveedor con el principal, que ningún fallback baje de 200k de contexto, que `FAST` no vuelva a ser igual que el default, y que todo modelo enrutado exista en el catálogo. Más `yarn verify:models`, que comprueba contra OpenRouter que los 21 ids existen, son enrutables y soportan `json_schema`.
 
@@ -238,7 +259,35 @@ Y `CACHED_CONTEXT_MODEL` merece mirada aparte antes de tocarlo: fijáis el prove
 
 ---
 
-## 7. Lo que no puedo decirte desde aquí
+## 7. Medir la proporción real entrada:salida
+
+Toda la comparación de arriba depende de un número que estoy estimando: cuántos tokens de entrada gastáis por cada uno de salida. `AiUsageLog` lo guarda por llamada, así que se puede saber en vez de suponer.
+
+```sql
+SELECT
+  feature,
+  model,
+  count(*)                                             AS llamadas,
+  sum("inputTokens")                                   AS entrada,
+  sum("outputTokens")                                  AS salida,
+  round(sum("inputTokens")::numeric
+        / nullif(sum("outputTokens"), 0), 1)           AS ratio,
+  round(sum("cachedTokens")::numeric * 100
+        / nullif(sum("inputTokens"), 0), 1)            AS pct_cacheado,
+  round(sum("estimatedCost")::numeric, 2)              AS coste_usd
+FROM "AiUsageLog"
+WHERE "createdAt" > now() - interval '30 days'
+GROUP BY feature, model
+ORDER BY coste_usd DESC;
+```
+
+Cómo leerlo: si la columna `ratio` sale **por debajo de 8,3** en las tareas que más gastan, 3.7 Flash os sale más barato que 2.5. Por encima, más caro, y la tabla del apartado 6 dice cuánto. La columna `pct_cacheado` es aparte pero interesa igual, porque los tokens de caché de Google se facturan a una fracción y si ese porcentaje es alto la entrada pesa bastante menos de lo que parece.
+
+Merece la pena mirarlo por `feature`, no solo en total. La extracción de tickets y la generación de documentos tienen perfiles muy distintos: una mete la transcripción entera y devuelve una lista corta, la otra devuelve páginas. Puede salir a cuenta dejarlas en modelos diferentes.
+
+---
+
+## 8. Lo que no puedo decirte desde aquí
 
 Todo lo anterior es **precio y capacidad**, dos cosas verificables. La calidad no lo es.
 

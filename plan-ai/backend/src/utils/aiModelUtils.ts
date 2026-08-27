@@ -4,47 +4,65 @@ import { AI_MODEL_LIMITS } from "../services/aiContextRouter";
 import prisma from "../prisma/prismaClient";
 import { logger } from "./logger";
 
-export const DEFAULT_AI_MODEL = "google/gemini-2.5-flash";
+// Gemini 3.7 Flash. Handles structured extraction and prose for the whole app.
+//
+// Replaced 2.5 Flash, which was fourteen months older, at effectively the same
+// price: input went up ($0.300 to $0.375 per 1M) and output came down ($2.500
+// to $1.875). Break-even sits at an input:output ratio of 8.3 to 1, and our
+// meetings land right about there, so the bill moves by well under 1% in either
+// direction. It only loses on very input-heavy calls (roughly 10% more at 20 to
+// 1). Before assuming a ratio, measure it: AiUsageLog stores inputTokens and
+// outputTokens per call.
+//
+// Same 1M context and same lineage, so the tokenizer, the json_schema
+// behaviour and Google's implicit prompt caching all carry over unchanged.
+export const DEFAULT_AI_MODEL = "google/gemini-3.7-flash";
 
-// FAST is deliberately a rung BELOW the default — it used to be the same model,
-// which made the name a lie and the constant pointless. Flash Lite is the same
-// family (same tokenizer, same json_schema behaviour, same implicit Google
-// caching) at ~$0.10/$0.40 per 1M instead of $0.30/$2.50, and it's what powers
-// chat, context-document processing and the Telegram agent: high volume, low
-// stakes per call, and a bad answer is immediately visible and retryable.
+// FAST is deliberately a rung BELOW the default. It used to be the same model,
+// which made the name a lie and the constant pointless. Flash Lite keeps the
+// Gemini behaviour (same tokenizer, same json_schema handling, same implicit
+// Google caching) at ~$0.10/$0.40 per 1M instead of $0.375/$1.875, and it's what
+// powers chat, context-document processing and the Telegram agent: high volume,
+// low stakes per call, and a bad answer is immediately visible and retryable.
+//
+// Staying on 2.5 Flash Lite on purpose. The 3.1 generation of Lite costs
+// $0.25/$1.50, which is nearly a full Flash, so moving up would collapse the
+// gap this constant exists to keep.
 export const FAST_AI_MODEL = "google/gemini-2.5-flash-lite";
+
 // ── Per-task model selection ───────────────────────────────────────────────
-// Gemini 2.5 Flash is the cheap + reliable default for structured extraction
-// and prose: ~same cost as minimax but far more dependable on json_schema and
-// better writing. Diagrams use a stronger model because Mermaid syntax is
-// strict — a single error makes the diagram unrenderable, so it's worth a
-// pricier model on those few calls (and the same model repairs broken syntax).
-export const TICKET_MODEL = "google/gemini-2.5-flash"; // task/ticket extraction
-export const DOC_MODEL = "google/gemini-2.5-flash"; // markdown document generation
-export const SLIDE_MODEL = "google/gemini-2.5-flash"; // slide deck generation
+// These three all track the default. They're separate constants so a task can
+// be moved on its own when there's a reason to, not because they differ today.
+export const TICKET_MODEL = "google/gemini-3.7-flash"; // task/ticket extraction
+export const DOC_MODEL = "google/gemini-3.7-flash"; // markdown document generation
+export const SLIDE_MODEL = "google/gemini-3.7-flash"; // slide deck generation
 // Haiku 4.5 rather than Sonnet: ~$1/$5 per 1M instead of Sonnet 4.6's $3/$15.
 //
-// The original reasoning — Mermaid's grammar is strict, a single error makes the
-// diagram unrenderable — was sound when written, but the economics had drifted
+// The original reasoning (Mermaid's grammar is strict, a single error makes the
+// diagram unrenderable) was sound when written, but the economics had drifted
 // badly: at Sonnet prices ONE diagram cost roughly twice as much as processing
-// the entire rest of the meeting. And the safety net has grown since: the
+// the entire rest of the meeting. And the safety net has grown since. The
 // frontend runs `repairMermaidSyntax` before every render, with targeted fixes
 // for the failures actually seen in the wild (quotes inside labels, xychart
 // corruption, zero-duration Gantt tasks). A syntax slip is no longer fatal.
 //
 // Haiku keeps the Anthropic lineage that handles strict syntax well, and 200k
-// context is far more than a diagram prompt needs. If diagram quality regresses,
-// this is one constant to move back — measure it with the Mermaid parser rather
-// than by eye (see MODELOS.md).
+// context is far more than a diagram prompt needs. If diagram quality regresses
+// this is one constant to move back, and it should be measured with the Mermaid
+// parser rather than by eye (see MODELOS.md).
 export const DIAGRAM_MODEL = "anthropic/claude-haiku-4.5"; // Mermaid generation + repair
 
 // Model used for the "big-context cached" route (e.g. injecting a whole repo).
-// Gemini 2.5 Flash: 1M context (a stripped repo fits), cheap, reliable
-// json_schema, and Google applies *implicit* prompt caching automatically — no
-// `cache_control` needed (that directive is Anthropic-only). We pin the provider
-// (allow_fallbacks: false) so repeated calls in a meeting's burst hit the same
-// endpoint and reuse the warm cache instead of bouncing across providers.
-export const CACHED_CONTEXT_MODEL = "google/gemini-2.5-flash";
+// Gemini 3.7 Flash: 1M context (a stripped repo fits), cheap, reliable
+// json_schema, and Google applies *implicit* prompt caching automatically, with
+// no `cache_control` needed (that directive is Anthropic-only). We pin the
+// provider (allow_fallbacks: false) so repeated calls in a meeting's burst hit
+// the same endpoint and reuse the warm cache instead of bouncing across
+// providers.
+//
+// Pinning is why this constant must stay on a model whose smallest route serves
+// the full window: with fallbacks off there is no reroute to a bigger endpoint.
+export const CACHED_CONTEXT_MODEL = "google/gemini-3.7-flash";
 // Fallback models used when the primary model fails.
 //
 // Two rules, both learned the hard way:
